@@ -5,7 +5,9 @@ const schema = mongoose.Schema( {
     ad: { type: String, required: true },
     soyad: { type: String, required: true },
     sifre_hash: { type: String, required: true }, // Hashed password
-    rol: { type: String, enum: ['Aday', 'Admin', 'Yönetici', 'Jüri Üyesi'], required: true }
+    rol: { type: String, enum: ['Aday', 'Admin', 'Yönetici', 'Jüri Üyesi'], required: true },
+    dogum_yili: { type: Number, required: true }
+
 }, 
 { timestamps: {
     versionKey: "false",
@@ -14,9 +16,9 @@ const schema = mongoose.Schema( {
 } }
 );
 
-class Users extends mongoose.Model{
+class User extends mongoose.Model{
 
 }
 
-schema.loadClass(Users);
-module.exports = mongoose.model("users", schema);
+schema.loadClass(User);
+module.exports = mongoose.model("user", schema);
