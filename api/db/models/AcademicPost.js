@@ -7,7 +7,9 @@ const schema = mongoose.Schema( {
     basvuru_baslangic_tarihi: { type: Date, required: true },
     basvuru_bitis_tarihi: { type: Date, required: true },
     durum: { type: String, enum: ['Açık', 'Kapalı', 'Tamamlandı'], default: 'Açık' },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    required_documents: [{ type: String, enum: ['İndeksli Yayın', 'Atıf Sayısı', 'Konferans Yayını'] }]
+
 }, 
 { timestamps: {
     versionKey: "false",
