@@ -110,13 +110,9 @@ router.post('/delete', authMiddleware, async (req, res) => {
     try {
         const { tc_kimlik_no } = req.user; // Extract from JWT
         const { target_tc_kimlik_no } = req.body; // User to be deleted
-
-        console.log(`🔍 Request to delete user: ${target_tc_kimlik_no} by ${tc_kimlik_no}`);
-
         // Ensure user exists
         const user = await User.findOne({ tc_kimlik_no: target_tc_kimlik_no });
         if (!user) return res.status(404).json({ error: 'User not found' });
-
         // Only allow self-deletion, unless the user is an admin
         if (tc_kimlik_no !== target_tc_kimlik_no && req.user.rol !== 'Admin') {
             return res.status(403).json({ error: 'Unauthorized: Cannot delete other users' });
