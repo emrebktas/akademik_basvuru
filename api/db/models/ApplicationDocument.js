@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 
 const schema = mongoose.Schema( {
-    application_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Application', required: true },
     belge_tipi: { type: String, enum: ['İndeksli Yayın', 'Atıf Sayısı', 'Konferans Yayını'], required: true },
     dosya_yolu: { type: String, required: true }
 }, 

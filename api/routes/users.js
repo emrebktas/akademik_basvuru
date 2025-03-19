@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
 
         // Generate JWT Token
         const token = jwt.sign(
-            { tc_kimlik_no: user.tc_kimlik_no, rol: user.rol },
+            { _id: user._id, tc_kimlik_no: user.tc_kimlik_no, rol: user.rol },
             process.env.JWT_SECRET,
             { expiresIn: '1h' } 
         );
