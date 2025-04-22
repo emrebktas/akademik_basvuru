@@ -5,19 +5,19 @@ const schema = mongoose.Schema( {
     ad: { type: String, required: true },
     soyad: { type: String, required: true },
     sifre_hash: { type: String, required: true }, // Hashed password
-    rol: { type: String, enum: ['Aday', 'Admin', 'Yönetici', 'Jüri Üyesi'], required: true },
+    rol: { type: String, enum: ['Aday', 'Admin', 'Yonetici', 'Juri'], required: true },
     dogum_yili: { type: Number, required: true }
-
 }, 
-{ timestamps: {
-    versionKey: "false",
-    createdAt: "created_at",
-    updatedAt: "updated_at"
-} }
-);
+{ 
+    timestamps: {
+        versionKey: false,  
+        createdAt: "created_at",
+        updatedAt: "updated_at"
+    }
+});
 
-class User extends mongoose.Model{
-
+class User extends mongoose.Model {
+    // Add any custom methods here
 }
 
 schema.loadClass(User);

@@ -1,6 +1,6 @@
 // src/Login.jsx
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -12,19 +12,16 @@ import {
   Text,
   Container,
   useToast,
-  Image,
-  Flex,
-  HStack,
-  SimpleGrid,
-  Center,
+  Card,
+  CardBody,
+  CardHeader,
   Tabs,
   TabList,
   TabPanels,
   Tab,
   TabPanel,
-  Card,
-  CardBody,
-  CardHeader,
+  Alert,
+  AlertIcon
 } from '@chakra-ui/react';
 import axios from 'axios';
 
@@ -36,6 +33,8 @@ function Login() {
     role: 'Aday'
   });
   const toast = useToast();
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,30 +55,67 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/users/login`, formData);
+      // Giriş yapılıyor
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/users/login`, {
+        tc_kimlik_no: formData.tc_kimlik_no,
+        password: formData.password
+      });
       
-      // Store token in localStorage
-      if (response.data && response.data.token) {
-        localStorage.setItem('token', response.data.token);
+      // Kullanıcının rolü ile seçilen sekmedeki rolün eşleşip eşleşmediğini kontrol et
+      const userRole = response.data.user.rol;
+      if (userRole !== formData.role) {
+        setError(`Lütfen rolünüze uygun sekmeden giriş yapınız.`);
+        return;
       }
       
+      // Token'ı localStorage'a kaydet
+      localStorage.setItem('token', response.data.token);
+      
+      // Kullanıcı bilgilerini localStorage'a kaydet
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Rolü ayrıca kaydet (ProtectedRoute için gerekli)
+      localStorage.setItem('role', response.data.user.rol);
+      
+      // Giriş başarılı bildirimi
       toast({
-        title: 'Login Successful',
+        title: 'Giriş Başarılı',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
       
-      // Redirect based on role
+      // Doğru role göre yönlendirme yap
+      switch (response.data.user.rol) {
+        case 'Aday':
+          navigate('/aday-ekrani');
+          break;
+        case 'Juri':
+          navigate('/juri-ekrani');
+          break;
+        case 'Yonetici':
+          navigate('/yonetici-ekrani');
+          break;
+        case 'Admin':
+          navigate('/admin-ekrani');
+          break;
+        default:
+          navigate('/');
+      }
     } catch (error) {
-      toast({
-        title: 'Login Failed',
-        description: error.response?.data?.error || 'Invalid credentials',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      // Kullanıcı adı veya şifre hatalı
+      if (error.response && error.response.status === 400) {
+        setError("TC kimlik no veya şifre hatalı!");
+      // Rol eşleşmiyor
+      } else if (error.response && error.response.status === 403) {
+        setError(error.response.data.error || 'Seçtiğiniz rol ile giriş yapamazsınız.');
+      // Diğer hatalar
+      } else {
+        setError("Giriş yapılırken bir hata oluştu.");
+        console.error("Login error:", error);
+      }
     }
   };
 
@@ -99,11 +135,17 @@ function Login() {
                 <Tab>Admin</Tab>
               </TabList>
               <TabPanels>
-                {/* Academic Staff Login Panel */}
+                {/* Aday Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
                     <VStack spacing={4} align="stretch">
                       <Heading size="md" mb={2}>Aday Giriş</Heading>
+                      {error && (
+                        <Alert status="error" borderRadius="md">
+                          <AlertIcon />
+                          {error}
+                        </Alert>
+                      )}
                       <FormControl isRequired>
                         <FormLabel>TC Kimlik Numarası</FormLabel>
                         <Input
@@ -137,11 +179,17 @@ function Login() {
                   </form>
                 </TabPanel>
 
-                {/* Jury Member Login Panel */}
+                {/* Jüri Üyesi Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
                     <VStack spacing={4} align="stretch">
                       <Heading size="md" mb={2}>Jüri Üyesi Giriş</Heading>
+                      {error && (
+                        <Alert status="error" borderRadius="md">
+                          <AlertIcon />
+                          {error}
+                        </Alert>
+                      )}
                       <FormControl isRequired>
                         <FormLabel>TC Kimlik Numarası</FormLabel>
                         <Input
@@ -175,11 +223,17 @@ function Login() {
                   </form>
                 </TabPanel>
 
-                {/* Manager Login Panel */}
+                {/* Yönetici Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
                     <VStack spacing={4} align="stretch">
                       <Heading size="md" mb={2}>Yönetici Giriş</Heading>
+                      {error && (
+                        <Alert status="error" borderRadius="md">
+                          <AlertIcon />
+                          {error}
+                        </Alert>
+                      )}
                       <FormControl isRequired>
                         <FormLabel>TC Kimlik Numarası</FormLabel>
                         <Input
@@ -187,7 +241,6 @@ function Login() {
                           type="text" 
                           value={formData.tc_kimlik_no}
                           onChange={handleChange}
-                          
                         />
                       </FormControl>
                       
@@ -214,11 +267,17 @@ function Login() {
                   </form>
                 </TabPanel>
 
-                {/* Admin Login Panel */}
+                {/* Admin Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
                     <VStack spacing={4} align="stretch">
                       <Heading size="md" mb={2}>Admin Girişi</Heading>
+                      {error && (
+                        <Alert status="error" borderRadius="md">
+                          <AlertIcon />
+                          {error}
+                        </Alert>
+                      )}
                       <FormControl isRequired>
                         <FormLabel>TC Kimlik Numarası</FormLabel>
                         <Input

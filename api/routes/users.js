@@ -83,11 +83,18 @@ router.post('/login', async (req, res) => {
         
         // Check if user exists
         const user = await User.findOne({ tc_kimlik_no });
-        if (!user) return res.status(400).json({ error: 'Invalid TC Kimlik No or password' });
+        if (!user) return res.status(400).json({ error: 'Geçersiz TC Kimlik No veya şifre' });
 
         // Verify Password
         const isMatch = await bcrypt.compare(password, user.sifre_hash);
-        if (!isMatch) return res.status(400).json({ error: 'Invalid TC Kimlik No or password' });
+        if (!isMatch) return res.status(400).json({ error: 'Geçersiz TC Kimlik No veya şifre' });
+
+        // Verify that the user has a role
+        if (!user.rol) {
+            return res.status(403).json({ 
+                error: 'Kullanıcı rolü tanımlanmamış. Sistem yöneticisiyle iletişime geçin.'
+            });
+        }
 
         // Generate JWT Token
         const token = jwt.sign(
@@ -98,7 +105,18 @@ router.post('/login', async (req, res) => {
 
         console.log('✅ Login successful, JWT issued.');
 
-        res.status(200).json({ message: 'Login successful', token });
+        // Return user information along with token
+        res.status(200).json({ 
+            message: 'Login successful', 
+            token,
+            user: {
+                _id: user._id,
+                tc_kimlik_no: user.tc_kimlik_no,
+                ad: user.ad,
+                soyad: user.soyad,
+                rol: user.rol
+            }
+        });
 
     } catch (error) {
         console.error('Server Error:', error.message);

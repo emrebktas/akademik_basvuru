@@ -83,4 +83,9 @@ out
 .serverless/
 
 # Local Netlify folder
-.netlify 
+.netlify    
+
+atama.pdf
+isterler.pdf
+
+node_modules/

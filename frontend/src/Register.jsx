@@ -10,11 +10,6 @@ import {
   Container,
   useToast,
   VStack,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Card,
   CardBody,
   CardHeader,
@@ -45,19 +40,6 @@ function Register() {
       ...prevState,
       [name]: value
     }));
-  };
-
-  const handleRoleChange = (index) => {
-    const roles = ['Aday', 'Juri', 'Yonetici', 'Admin'];
-    setFormData({
-      tc_kimlik_no: '',
-      ad: '',
-      soyad: '',
-      password: '',
-      password_confirm: '',
-      rol: roles[index],
-      dogum_yili: ''
-    });
   };
 
   const handleSubmit = async (e) => {
@@ -110,351 +92,86 @@ function Register() {
             <Heading size="lg" textAlign="center">Akademik Başvuru Sistemi</Heading>
           </CardHeader>
           <CardBody>
-            <Tabs isFitted variant="enclosed" onChange={handleRoleChange}>
-              <TabList mb="1em">
-                <Tab>Aday</Tab>
-                <Tab>Jüri Üyesi</Tab>
-                <Tab>Yönetici</Tab>
-                <Tab>Admin</Tab>
-              </TabList>
-              <TabPanels>
-                {/* Registration Panel for Academic Staff */}
-                <TabPanel>
-                  <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Aday Kayıt</Heading>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>T.C. Kimlik No</FormLabel>
-                        <Input
-                          name="tc_kimlik_no"
-                          type="text" 
-                          value={formData.tc_kimlik_no}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Ad</FormLabel>
-                        <Input
-                          name="ad"
-                          type="text" 
-                          value={formData.ad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Soyad</FormLabel>
-                        <Input
-                          name="soyad"
-                          type="text" 
-                          value={formData.soyad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Doğum Yılı</FormLabel>
-                        <Select
-                          name="dogum_yili"
-                          value={formData.dogum_yili}
-                          onChange={handleChange}
-                          placeholder="Doğum yılınızı seçin"
-                        >
-                          {years.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
-                        <Input
-                          name="password"
-                          type="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre Tekrar</FormLabel>
-                        <Input
-                          name="password_confirm"
-                          type="password"
-                          value={formData.password_confirm}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <Button 
-                        type="submit" 
-                        colorScheme="blue"
-                        width="full"
-                        mt={2}
-                      >
-                        Kayıt Ol
-                      </Button>
-                    </VStack>
-                  </form>
-                </TabPanel>
-
-                {/* Registration Panel for Jury */}
-                <TabPanel>
-                  <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Jüri Üyesi Kayıt</Heading>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>T.C. Kimlik No</FormLabel>
-                        <Input
-                          name="tc_kimlik_no"
-                          type="text" 
-                          value={formData.tc_kimlik_no}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Ad</FormLabel>
-                        <Input
-                          name="ad"
-                          type="text" 
-                          value={formData.ad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Soyad</FormLabel>
-                        <Input
-                          name="soyad"
-                          type="text" 
-                          value={formData.soyad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Doğum Yılı</FormLabel>
-                        <Select
-                          name="dogum_yili"
-                          value={formData.dogum_yili}
-                          onChange={handleChange}
-                          placeholder="Doğum yılınızı seçin"
-                        >
-                          {years.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
-                        <Input
-                          name="password"
-                          type="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre Tekrar</FormLabel>
-                        <Input
-                          name="password_confirm"
-                          type="password"
-                          value={formData.password_confirm}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <Button 
-                        type="submit" 
-                        colorScheme="blue"
-                        width="full"
-                        mt={2}
-                      >
-                        Kayıt Ol
-                      </Button>
-                    </VStack>
-                  </form>
-                </TabPanel>
-
-                {/* Registration Panel for Manager */}
-                <TabPanel>
-                  <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Yönetici Kayıt</Heading>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>T.C. Kimlik No</FormLabel>
-                        <Input
-                          name="tc_kimlik_no"
-                          type="text" 
-                          value={formData.tc_kimlik_no}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Ad</FormLabel>
-                        <Input
-                          name="ad"
-                          type="text" 
-                          value={formData.ad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Soyad</FormLabel>
-                        <Input
-                          name="soyad"
-                          type="text" 
-                          value={formData.soyad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Doğum Yılı</FormLabel>
-                        <Select
-                          name="dogum_yili"
-                          value={formData.dogum_yili}
-                          onChange={handleChange}
-                          placeholder="Doğum yılınızı seçin"
-                        >
-                          {years.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
-                        <Input
-                          name="password"
-                          type="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre Tekrar</FormLabel>
-                        <Input
-                          name="password_confirm"
-                          type="password"
-                          value={formData.password_confirm}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <Button 
-                        type="submit" 
-                        colorScheme="blue"
-                        width="full"
-                        mt={2}
-                      >
-                        Kayıt Ol
-                      </Button>
-                    </VStack>
-                  </form>
-                </TabPanel>
-
-                {/* Registration Panel for Admin */}
-                <TabPanel>
-                  <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Admin Kayıt</Heading>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>T.C. Kimlik No</FormLabel>
-                        <Input
-                          name="tc_kimlik_no"
-                          type="text" 
-                          value={formData.tc_kimlik_no}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Ad</FormLabel>
-                        <Input
-                          name="ad"
-                          type="text" 
-                          value={formData.ad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Soyad</FormLabel>
-                        <Input
-                          name="soyad"
-                          type="text" 
-                          value={formData.soyad}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Doğum Yılı</FormLabel>
-                        <Select
-                          name="dogum_yili"
-                          value={formData.dogum_yili}
-                          onChange={handleChange}
-                          placeholder="Doğum yılınızı seçin"
-                        >
-                          {years.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
-                        <Input
-                          name="password"
-                          type="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <FormControl isRequired>
-                        <FormLabel>Şifre Tekrar</FormLabel>
-                        <Input
-                          name="password_confirm"
-                          type="password"
-                          value={formData.password_confirm}
-                          onChange={handleChange}
-                        />
-                      </FormControl>
-                      
-                      <Button 
-                        type="submit" 
-                        colorScheme="blue"
-                        width="full"
-                        mt={2}
-                      >
-                        Kayıt Ol
-                      </Button>
-                    </VStack>
-                  </form>
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
+            <form onSubmit={handleSubmit}>
+              <VStack spacing={4} align="stretch">
+                <Heading size="md" mb={2}>Aday Kayıt</Heading>
+                
+                <FormControl isRequired>
+                  <FormLabel>T.C. Kimlik No</FormLabel>
+                  <Input
+                    name="tc_kimlik_no"
+                    type="text" 
+                    value={formData.tc_kimlik_no}
+                    onChange={handleChange}
+                  />
+                </FormControl>
+                
+                <FormControl isRequired>
+                  <FormLabel>Ad</FormLabel>
+                  <Input
+                    name="ad"
+                    type="text" 
+                    value={formData.ad}
+                    onChange={handleChange}
+                  />
+                </FormControl>
+                
+                <FormControl isRequired>
+                  <FormLabel>Soyad</FormLabel>
+                  <Input
+                    name="soyad"
+                    type="text" 
+                    value={formData.soyad}
+                    onChange={handleChange}
+                  />
+                </FormControl>
+                
+                <FormControl isRequired>
+                  <FormLabel>Doğum Yılı</FormLabel>
+                  <Select
+                    name="dogum_yili"
+                    value={formData.dogum_yili}
+                    onChange={handleChange}
+                    placeholder="Doğum yılınızı seçin"
+                  >
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <FormControl isRequired>
+                  <FormLabel>Şifre</FormLabel>
+                  <Input
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                </FormControl>
+                
+                <FormControl isRequired>
+                  <FormLabel>Şifre Tekrar</FormLabel>
+                  <Input
+                    name="password_confirm"
+                    type="password"
+                    value={formData.password_confirm}
+                    onChange={handleChange}
+                  />
+                </FormControl>
+                
+                <Button 
+                  type="submit" 
+                  colorScheme="blue"
+                  width="full"
+                  mt={2}
+                >
+                  Kayıt Ol
+                </Button>
+              </VStack>
+            </form>
 
             <Text textAlign="center" mt={4}>
               Hesabınız var mı?{" "}
