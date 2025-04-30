@@ -18,7 +18,14 @@ const schema = mongoose.Schema({
     jury_members: [{
         user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
         role: { type: String, enum: ['Başkan', 'Üye'] },
-        evaluation_status: { type: String, enum: ['Beklemede', 'Tamamlandı'], default: 'Beklemede' }
+        evaluation_status: { type: String, enum: ['Beklemede', 'Tamamlandı'], default: 'Beklemede' },
+        evaluation: {
+            decision: { type: String, enum: ['Olumlu', 'Olumsuz'] },
+            comments: { type: String },
+            report_url: { type: String },
+            report_name: { type: String },
+            date: { type: Date }
+        }
     }],
     final_decision: {
         status: { type: String, enum: ['Onaylandı', 'Reddedildi'] },
@@ -34,7 +41,50 @@ const schema = mongoose.Schema({
 });
 
 class Application extends mongoose.Model {
-    // Add any custom methods here
+    // Jüri atamalarını kontrol eden metod
+    async checkJuryEvaluationStatus() {
+        // Tüm jüri üyeleri değerlendirme yaptı mı?
+        if (this.jury_members && this.jury_members.length > 0) {
+            const allCompleted = this.jury_members.every(member => 
+                member.evaluation_status === 'Tamamlandı'
+            );
+            
+            if (allCompleted) {
+                // Olumlu/olumsuz oyları say
+                const positiveVotes = this.jury_members.filter(
+                    member => member.evaluation && member.evaluation.decision === 'Olumlu'
+                ).length;
+                
+                const totalVotes = this.jury_members.length;
+                const majorityNeeded = Math.ceil(totalVotes / 2);
+                
+                // Çoğunluk kararı
+                if (positiveVotes >= majorityNeeded) {
+                    return 'Onaylandı';
+                } else {
+                    return 'Reddedildi';
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    // Jüri üyesinin değerlendirmesini kaydetme metodu
+    async saveJuryEvaluation(juryId, evaluationData) {
+        const juryIndex = this.jury_members.findIndex(
+            member => member.user_id.toString() === juryId.toString()
+        );
+        
+        if (juryIndex === -1) {
+            throw new Error('Jüri üyesi bu başvuruya atanmamış.');
+        }
+        
+        this.jury_members[juryIndex].evaluation = evaluationData;
+        this.jury_members[juryIndex].evaluation_status = 'Tamamlandı';
+        
+        return this.save();
+    }
 }
 
 schema.loadClass(Application);

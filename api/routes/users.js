@@ -29,8 +29,8 @@ router.post('/register', async (req, res) => {
             console.log('Sending request to NVİ for verification...');
             const args = {
                 TCKimlikNo: tc_kimlik_no,
-                Ad: ad.toUpperCase(),
-                Soyad: soyad.toUpperCase(),
+                Ad: ad.toLocaleUpperCase('tr-TR'),
+                Soyad: soyad.toLocaleUpperCase('tr-TR'),
                 DogumYili: dogum_yili
             };
 

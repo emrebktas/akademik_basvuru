@@ -21,10 +21,25 @@ import {
   Tab,
   TabPanel,
   Alert,
-  AlertIcon
+  AlertIcon,
+  Divider,
+  Flex,
+  Icon
 } from '@chakra-ui/react';
 import axios from 'axios';
+import { FaUser, FaUserTie, FaUserCog, FaUserShield, FaGraduationCap } from 'react-icons/fa';
 
+// Kocaeli Üniversitesi tema renkleri
+const theme = {
+  primary: "#17468f", // Koyu Mavi (Ana renk)
+  secondary: "#e74c3c", // Kırmızı (Vurgu rengi)
+  tertiary: "#1abc9c", // Turkuaz (Yardımcı renk)
+  light: "#ecf0f1", // Açık gri
+  success: "#2ecc71", // Yeşil
+  warning: "#f39c12", // Turuncu
+  danger: "#c0392b", // Koyu kırmızı
+  info: "#3498db" // Açık mavi
+};
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -120,60 +135,135 @@ function Login() {
   };
 
   return (
-    <Box minH="100vh" bg="gray.50" py={10}>
+    <Box minH="100vh" bg={theme.light} py={10}>
       <Container maxW="container.md">
-        <Card boxShadow="md" mb={8}>
-          <CardHeader bg="blue.600" color="white">
-            <Heading size="lg" textAlign="center">Akademik Başvuru Sistemi</Heading>
+        {/* Header */}
+        <Box textAlign="center" mb={6}>
+          <Heading size="2xl" color={theme.primary}>Kocaeli Üniversitesi</Heading>
+          <Heading size="md" color={theme.primary} mt={2}>Akademik İlan Başvuru Sistemi</Heading>
+          <Divider my={4} borderColor={theme.secondary} borderWidth="2px" width="60%" mx="auto" />
+        </Box>
+
+        <Card boxShadow="lg" borderRadius="lg" overflow="hidden">
+          <CardHeader bg={theme.primary} color="white" py={4} textAlign="center">
+            <Heading size="lg">Giriş Yap</Heading>
           </CardHeader>
-          <CardBody>
-            <Tabs isFitted variant="enclosed" onChange={handleRoleChange}>
-              <TabList mb="1em">
-                <Tab>Aday</Tab>
-                <Tab>Jüri</Tab>
-                <Tab>Yönetici</Tab>
-                <Tab>Admin</Tab>
+          <CardBody bg="white" p={6}>
+            <Tabs 
+              isFitted 
+              variant="soft-rounded" 
+              onChange={handleRoleChange}
+              colorScheme="blue"
+            >
+              <TabList mb="1.5em" gap={3}>
+                <Tab 
+                  _selected={{ 
+                    color: "white", 
+                    bg: theme.primary,
+                    fontWeight: "bold"
+                  }}
+                  borderRadius="full"
+                >
+                  <Icon as={FaGraduationCap} mr={2} />
+                  Aday
+                </Tab>
+                <Tab 
+                  _selected={{ 
+                    color: "white", 
+                    bg: theme.primary,
+                    fontWeight: "bold"
+                  }}
+                  borderRadius="full"
+                >
+                  <Icon as={FaUserTie} mr={2} />
+                  Jüri
+                </Tab>
+                <Tab 
+                  _selected={{ 
+                    color: "white", 
+                    bg: theme.primary,
+                    fontWeight: "bold"
+                  }}
+                  borderRadius="full"
+                >
+                  <Icon as={FaUserCog} mr={2} />
+                  Yönetici
+                </Tab>
+                <Tab 
+                  _selected={{ 
+                    color: "white", 
+                    bg: theme.primary,
+                    fontWeight: "bold"
+                  }}
+                  borderRadius="full"
+                >
+                  <Icon as={FaUserShield} mr={2} />
+                  Admin
+                </Tab>
               </TabList>
               <TabPanels>
                 {/* Aday Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Aday Giriş</Heading>
+                    <VStack spacing={5} align="stretch">
+                      <Flex justifyContent="center" mb={4}>
+                        <Flex 
+                          bg={`${theme.primary}20`} 
+                          p={4} 
+                          borderRadius="full" 
+                          color={theme.primary}
+                          boxSize="80px"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon as={FaGraduationCap} boxSize="40px" />
+                        </Flex>
+                      </Flex>
                       {error && (
-                        <Alert status="error" borderRadius="md">
-                          <AlertIcon />
+                        <Alert status="error" borderRadius="md" bg={`${theme.danger}10`}>
+                          <AlertIcon color={theme.danger} />
                           {error}
                         </Alert>
                       )}
                       <FormControl isRequired>
-                        <FormLabel>TC Kimlik Numarası</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>TC Kimlik Numarası</FormLabel>
                         <Input
                           name="tc_kimlik_no"
                           type="text" 
                           value={formData.tc_kimlik_no}
                           onChange={handleChange}
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="TC Kimlik numaranızı giriniz"
                         />
                       </FormControl>
                       
                       <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>Şifre</FormLabel>
                         <Input
                           name="password"
                           type="password"
                           value={formData.password}
                           onChange={handleChange}
                           autoComplete="current-password"
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="Şifrenizi giriniz"
                         />
                       </FormControl>
                       
                       <Button 
                         type="submit" 
-                        colorScheme="blue"
+                        bg={theme.primary}
+                        color="white"
                         width="full"
-                        mt={2}
+                        mt={4}
+                        _hover={{ bg: theme.info }}
+                        size="lg"
                       >
-                        Giriş
+                        Giriş Yap
                       </Button>
                     </VStack>
                   </form>
@@ -182,42 +272,65 @@ function Login() {
                 {/* Jüri Üyesi Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Jüri Üyesi Giriş</Heading>
+                    <VStack spacing={5} align="stretch">
+                      <Flex justifyContent="center" mb={4}>
+                        <Flex 
+                          bg={`${theme.primary}20`} 
+                          p={4} 
+                          borderRadius="full" 
+                          color={theme.primary}
+                          boxSize="80px"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon as={FaUserTie} boxSize="40px" />
+                        </Flex>
+                      </Flex>
                       {error && (
-                        <Alert status="error" borderRadius="md">
-                          <AlertIcon />
+                        <Alert status="error" borderRadius="md" bg={`${theme.danger}10`}>
+                          <AlertIcon color={theme.danger} />
                           {error}
                         </Alert>
                       )}
                       <FormControl isRequired>
-                        <FormLabel>TC Kimlik Numarası</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>TC Kimlik Numarası</FormLabel>
                         <Input
                           name="tc_kimlik_no"
                           type="text" 
                           value={formData.tc_kimlik_no}
                           onChange={handleChange}
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="TC Kimlik numaranızı giriniz"
                         />
                       </FormControl>
                       
                       <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>Şifre</FormLabel>
                         <Input
                           name="password"
                           type="password"
                           value={formData.password}
                           onChange={handleChange}
                           autoComplete="current-password"
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="Şifrenizi giriniz"
                         />
                       </FormControl>
                       
                       <Button 
                         type="submit" 
-                        colorScheme="blue"
+                        bg={theme.primary}
+                        color="white"
                         width="full"
-                        mt={2}
+                        mt={4}
+                        _hover={{ bg: theme.info }}
+                        size="lg"
                       >
-                        Giriş
+                        Giriş Yap
                       </Button>
                     </VStack>
                   </form>
@@ -226,42 +339,65 @@ function Login() {
                 {/* Yönetici Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Yönetici Giriş</Heading>
+                    <VStack spacing={5} align="stretch">
+                      <Flex justifyContent="center" mb={4}>
+                        <Flex 
+                          bg={`${theme.primary}20`} 
+                          p={4} 
+                          borderRadius="full" 
+                          color={theme.primary}
+                          boxSize="80px"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon as={FaUserCog} boxSize="40px" />
+                        </Flex>
+                      </Flex>
                       {error && (
-                        <Alert status="error" borderRadius="md">
-                          <AlertIcon />
+                        <Alert status="error" borderRadius="md" bg={`${theme.danger}10`}>
+                          <AlertIcon color={theme.danger} />
                           {error}
                         </Alert>
                       )}
                       <FormControl isRequired>
-                        <FormLabel>TC Kimlik Numarası</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>TC Kimlik Numarası</FormLabel>
                         <Input
                           name="tc_kimlik_no"
                           type="text" 
                           value={formData.tc_kimlik_no}
                           onChange={handleChange}
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="TC Kimlik numaranızı giriniz"
                         />
                       </FormControl>
                       
                       <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>Şifre</FormLabel>
                         <Input
                           name="password"
                           type="password"
                           value={formData.password}
                           onChange={handleChange}
                           autoComplete="current-password"
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="Şifrenizi giriniz"
                         />
                       </FormControl>
                       
                       <Button 
                         type="submit" 
-                        colorScheme="blue"
+                        bg={theme.primary}
+                        color="white"
                         width="full"
-                        mt={2}
+                        mt={4}
+                        _hover={{ bg: theme.info }}
+                        size="lg"
                       >
-                        Giriş
+                        Giriş Yap
                       </Button>
                     </VStack>
                   </form>
@@ -270,42 +406,65 @@ function Login() {
                 {/* Admin Giriş Paneli */}
                 <TabPanel>
                   <form onSubmit={handleSubmit}>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" mb={2}>Admin Girişi</Heading>
+                    <VStack spacing={5} align="stretch">
+                      <Flex justifyContent="center" mb={4}>
+                        <Flex 
+                          bg={`${theme.primary}20`} 
+                          p={4} 
+                          borderRadius="full" 
+                          color={theme.primary}
+                          boxSize="80px"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon as={FaUserShield} boxSize="40px" />
+                        </Flex>
+                      </Flex>
                       {error && (
-                        <Alert status="error" borderRadius="md">
-                          <AlertIcon />
+                        <Alert status="error" borderRadius="md" bg={`${theme.danger}10`}>
+                          <AlertIcon color={theme.danger} />
                           {error}
                         </Alert>
                       )}
                       <FormControl isRequired>
-                        <FormLabel>TC Kimlik Numarası</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>TC Kimlik Numarası</FormLabel>
                         <Input
                           name="tc_kimlik_no"
                           type="text" 
                           value={formData.tc_kimlik_no}
                           onChange={handleChange}
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="TC Kimlik numaranızı giriniz"
                         />
                       </FormControl>
                       
                       <FormControl isRequired>
-                        <FormLabel>Şifre</FormLabel>
+                        <FormLabel fontWeight="bold" color={theme.primary}>Şifre</FormLabel>
                         <Input
                           name="password"
                           type="password"
                           value={formData.password}
                           onChange={handleChange}
                           autoComplete="current-password"
+                          borderColor="gray.300"
+                          focusBorderColor={theme.primary}
+                          _hover={{ borderColor: theme.info }}
+                          placeholder="Şifrenizi giriniz"
                         />
                       </FormControl>
                       
                       <Button 
                         type="submit" 
-                        colorScheme="blue"
+                        bg={theme.primary}
+                        color="white"
                         width="full"
-                        mt={2}
+                        mt={4}
+                        _hover={{ bg: theme.info }}
+                        size="lg"
                       >
-                        Giriş
+                        Giriş Yap
                       </Button>
                     </VStack>
                   </form>
@@ -313,11 +472,31 @@ function Login() {
               </TabPanels>
             </Tabs>
 
-            <Text textAlign="center" mt={4}>
+            <Divider my={6} borderColor={`${theme.primary}30`} />
+
+            <Text textAlign="center" color={theme.primary}>
               Sisteme kayıtlı değil misiniz?{" "}
               <Link to="/register">
-                <Button variant="link" colorScheme="blue" size="sm">
+                <Button 
+                  variant="link" 
+                  color={theme.secondary}
+                  _hover={{ color: theme.danger }}
+                  fontWeight="bold"
+                >
                   Kayıt ol
+                </Button>
+              </Link>
+            </Text>
+            
+            <Text textAlign="center" mt={4} fontSize="sm" color="gray.500">
+              <Link to="/">
+                <Button 
+                  variant="link" 
+                  color={theme.primary}
+                  size="sm"
+                  fontWeight="normal"
+                >
+                  Ana Sayfaya Dön
                 </Button>
               </Link>
             </Text>

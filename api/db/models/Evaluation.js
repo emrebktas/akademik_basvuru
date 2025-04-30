@@ -1,60 +1,70 @@
 const mongoose = require("mongoose");
 
-const juryEvaluationSchema = new mongoose.Schema({
-  jury_member: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'user',
-    required: true
-  },
-  points: { type: Number, default: 0 },
-  evaluation_report: { type: String },
-  submitted_at: { type: Date, default: Date.now }
-});
-
 const evaluationSchema = new mongoose.Schema({
-  application: {
+  application_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'application',
     required: true
   },
-  jury_evaluations: [juryEvaluationSchema],
+  juror_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    required: true
+  },
+  assigned_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    required: true
+  },
+  assigned_at: { 
+    type: Date, 
+    default: Date.now 
+  },
   status: {
     type: String,
     enum: ['Beklemede', 'Değerlendirme Devam Ediyor', 'Tamamlandı'],
     default: 'Beklemede'
   },
-  final_decision: {
-    status: {
-      type: String,
-      enum: ['Beklemede', 'Kabul Edildi', 'Reddedildi'],
-      default: 'Beklemede'
-    },
-    notes: { type: String },
-    decision_date: { type: Date }
+  points: { 
+    type: Number,
+    default: 0
   },
-  created_at: { type: Date, default: Date.now }
+  evaluation_report: { 
+    type: String 
+  },
+  comments: { 
+    type: String 
+  },
+  completed_at: { 
+    type: Date 
+  },
+  created_at: { 
+    type: Date, 
+    default: Date.now 
+  }
 }, {
   timestamps: true
 });
 
-// Calculate average points from jury evaluations
-evaluationSchema.virtual('average_points').get(function() {
-  if (this.jury_evaluations.length === 0) return 0;
-  const total = this.jury_evaluations.reduce((sum, eval) => sum + eval.points, 0);
-  return total / this.jury_evaluations.length;
-});
+// Create a compound index to ensure one evaluation per juror per application
+evaluationSchema.index({ application_id: 1, juror_id: 1 }, { unique: true });
 
-// Ensure all jury members have submitted their evaluations before final decision
-evaluationSchema.pre('save', function(next) {
-  if (this.final_decision.status !== 'Beklemede' && 
-      this.jury_evaluations.length < this.jury.members.length) {
-    return next(new Error('All jury members must submit their evaluations before final decision'));
+class Evaluation extends mongoose.Model {
+  // Mark evaluation as completed
+  async complete(points, report, comments) {
+    this.status = 'Tamamlandı';
+    this.points = points;
+    this.evaluation_report = report;
+    this.comments = comments;
+    this.completed_at = new Date();
+    return this.save();
   }
-  next();
-});
 
-class Evaluation extends mongoose.Model{
-
+  // Update evaluation status
+  async updateStatus(status) {
+    this.status = status;
+    return this.save();
+  }
 }
 
 evaluationSchema.loadClass(Evaluation);

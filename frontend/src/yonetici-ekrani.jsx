@@ -55,10 +55,54 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogContent,
-    AlertDialogOverlay
+    AlertDialogOverlay,
+    Container,
+    SimpleGrid,
+    Flex,
+    Icon,
+    Divider,
+    IconButton,
+    Tooltip
 } from '@chakra-ui/react';
 import axios from 'axios';
-import { FaFilePdf, FaUserPlus, FaUsers, FaClipboardList } from 'react-icons/fa';
+import { 
+    FaFilePdf, 
+    FaUserPlus, 
+    FaUsers, 
+    FaClipboardList, 
+    FaTrash,
+    FaGraduationCap,
+    FaUniversity,
+    FaUserGraduate,
+    FaCalendarAlt,
+    FaSearch,
+    FaUpload,
+    FaClipboardCheck,
+    FaAngleRight,
+    FaCog,
+    FaChartBar,
+    FaFileAlt,
+    FaCheckCircle,
+    FaClock,
+    FaExclamationCircle,
+    FaPlus,
+    FaEdit,
+    FaSignOutAlt
+} from 'react-icons/fa';
+import { DeleteIcon } from '@chakra-ui/icons';
+import { useNavigate } from 'react-router-dom';
+
+// Theme colors from main page
+const theme = {
+    primary: "#17468f",    // Koyu Mavi (Ana renk)
+    secondary: "#e74c3c",  // Kırmızı (Vurgu rengi)
+    tertiary: "#1abc9c",   // Turkuaz (Yardımcı renk)
+    light: "#ecf0f1",      // Açık gri
+    success: "#2ecc71",    // Yeşil
+    warning: "#f39c12",    // Turuncu
+    danger: "#c0392b",     // Koyu kırmızı
+    info: "#3498db"        // Açık mavi
+};
 
 const YoneticiEkrani = () => {
     // State management
@@ -72,7 +116,13 @@ const YoneticiEkrani = () => {
     const [applications, setApplications] = useState([]);
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [availableJurors, setAvailableJurors] = useState([]);
+    const [assignedJurors, setAssignedJurors] = useState([]);
+    const [selectedApplicationId, setSelectedApplicationId] = useState(null);
+    const [removingJuror, setRemovingJuror] = useState(false);
+    const [jurorToDelete, setJurorToDelete] = useState(null);
     const toast = useToast();
+    const navigate = useNavigate();
 
     // Modal states
     const { isOpen: isCriteriaModalOpen, onOpen: onCriteriaModalOpen, onClose: onCriteriaModalClose } = useDisclosure();
@@ -80,6 +130,8 @@ const YoneticiEkrani = () => {
     const { isOpen: isEditModalOpen, onOpen: onEditModalOpen, onClose: onEditModalClose } = useDisclosure();
     const { isOpen: isDeleteDialogOpen, onOpen: onDeleteDialogOpen, onClose: onDeleteDialogClose } = useDisclosure();
     const { isOpen: isDeleteCategoryDialogOpen, onOpen: onDeleteCategoryDialogOpen, onClose: onDeleteCategoryDialogClose } = useDisclosure();
+    const { isOpen: isDeleteApplicationDialogOpen, onOpen: onDeleteApplicationDialogOpen, onClose: onDeleteApplicationDialogClose } = useDisclosure();
+    const { isOpen: isDeleteJurorDialogOpen, onOpen: onDeleteJurorDialogOpen, onClose: onDeleteJurorDialogClose } = useDisclosure();
 
     // Form states
     const [newCriteria, setNewCriteria] = useState({
@@ -89,15 +141,16 @@ const YoneticiEkrani = () => {
     });
 
     const [newJury, setNewJury] = useState({
-        postId: '',
-        members: Array(5).fill({ user_id: '', role: 'Üye' })
+        juryMembers: []
     });     
 
     const [editingCriteria, setEditingCriteria] = useState(null);
     const [criteriaToDelete, setCriteriaToDelete] = useState(null);
     const [categoryToDelete, setCategoryToDelete] = useState({ criteriaIndex: null, categoryIndex: null });
+    const [applicationToDelete, setApplicationToDelete] = useState(null);
     const cancelRef = React.useRef();
     const cancelCategoryRef = React.useRef();
+    const cancelApplicationRef = React.useRef();
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -232,10 +285,60 @@ const YoneticiEkrani = () => {
         }
     };
 
-    const handleAssignJury = async () => {
+    const fetchAvailableJurors = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post('/api/yonetici/jury', newJury, {
+            const response = await axios.get('/api/yonetici/available-jurors', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAvailableJurors(response.data);
+        } catch (err) {
+            console.error('Error fetching available jurors:', err);
+            toast({
+                title: 'Hata',
+                description: 'Jüri üyeleri alınırken bir hata oluştu',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+    };
+
+    const fetchAssignedJurors = async (applicationId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`/api/yonetici/applications/${applicationId}/jurors`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAssignedJurors(response.data);
+        } catch (err) {
+            console.error('Error fetching assigned jurors:', err);
+            toast({
+                title: 'Hata',
+                description: 'Atanmış jüri üyeleri alınırken bir hata oluştu',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+    };
+
+    const handleAssignJury = async () => {
+        try {
+            if (!selectedApplicationId) {
+                toast({
+                    title: 'Hata',
+                    description: 'Lütfen bir başvuru seçin',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                });
+                return;
+            }
+
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            await axios.post(`/api/yonetici/applications/${selectedApplicationId}/assign-jury`, newJury, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -248,56 +351,101 @@ const YoneticiEkrani = () => {
             });
 
             onJuryModalClose();
-            fetchDashboardData();
+            
+            // Refresh data
+            await fetchAssignedJurors(selectedApplicationId);
+            await fetchDashboardData();
+            
+            // Refresh applications list to show updated status
+            const currentPostId = applications.length > 0 ? applications[0].ilan_id : null;
+            if (currentPostId) {
+                await fetchApplications(currentPostId);
+            }
+            
+            setLoading(false);
         } catch (err) {
             console.error('Jury assignment error:', err);
             toast({
                 title: 'Hata',
-                description: 'Jüri atanırken bir hata oluştu',
+                description: err.response?.data?.error || 'Jüri atanırken bir hata oluştu',
                 status: 'error',
                 duration: 5000,
                 isClosable: true,
             });
+            setLoading(false);
         }
     };
 
-    const handleGenerateTable5 = async (applicationId) => {
+    const handleGenerateAtamaYonergesi = async (applicationId) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`/api/yonetici/applications/${applicationId}/table5`, {
-                headers: { Authorization: `Bearer ${token}` },
+            // Önce başvuru verilerini alıyoruz
+            const appResponse = await axios.get(`/api/yonetici/applications/${applicationId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            const applicationData = appResponse.data;
+            console.log("Başvuru verisi:", applicationData);
+            
+            // PDF'i oluşturmak için gerekli verileri hazırla
+            const pdfData = {
+                academic_post: applicationData.ilan_id?.kademe || 'Dr. Öğr. Üyesi',
+                kademe: applicationData.ilan_id?.kademe || 'Dr. Öğr. Üyesi',
+                fieldGroup: applicationData.ilan_id?.alan || 'saglik-fen',
+                personalInfo: {
+                    fullName: `${applicationData.aday_id?.ad || ''} ${applicationData.aday_id?.soyad || ''}`,
+                    languageExam: applicationData.aday_id?.yabanci_dil || 'YDS',
+                    languageScore: applicationData.aday_id?.yabanci_dil_puani || '80'
+                },
+                publications: applicationData.yayinlar || [],
+                stats: {
+                    totalCount: applicationData.yayinlar?.length || 0,
+                    a1a2Count: applicationData.yayinlar?.filter(p => p.category === 'A1' || p.category === 'A2').length || 0,
+                    a1a4Count: applicationData.yayinlar?.filter(p => ['A1', 'A2', 'A3', 'A4'].includes(p.category)).length || 0,
+                    a1a5Count: applicationData.yayinlar?.filter(p => ['A1', 'A2', 'A3', 'A4', 'A5'].includes(p.category)).length || 0,
+                    mainAuthorCount: applicationData.yayinlar?.filter(p => p.isMainAuthor).length || 0,
+                    totalPoints: applicationData.puan || 0
+                },
+                criteria: applicationData.puan_dagilimi || [],
+                totalPoints: applicationData.puan || 0
+            };
+            
+            console.log("PDF verisi:", pdfData);
+            
+            // PDF dosyasını oluştur ve indir
+            const response = await axios.post('/api/generate-pdf/atama-yonergesi', pdfData, {
+                headers: { 
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
                 responseType: 'blob'
             });
-
+            
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `tablo5-${applicationId}.pdf`);
+            link.setAttribute('download', `${applicationData.aday_id?.ad}-${applicationData.aday_id?.soyad}-${applicationData.ilan_id?.ilan_basligi}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.remove();
+            
+            // Show success message
+            toast({
+                title: 'Başarılı',
+                description: 'Önizleme PDF dosyası başarıyla indirildi',
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+            });
         } catch (err) {
-            console.error('Table 5 generation error:', err);
+            console.error('Önizleme PDF oluşturma hatası:', err);
             toast({
                 title: 'Hata',
-                description: 'Tablo 5 oluşturulurken bir hata oluştu',
+                description: 'Önizleme PDF oluşturulurken bir hata oluştu',
                 status: 'error',
                 duration: 5000,
                 isClosable: true,
             });
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Beklemede':
-                return 'yellow';
-            case 'Juri Değerlendirmesinde':
-                return 'blue';
-            case 'Onaylandı':
-                return 'green';
-            default:
-                return 'gray';
         }
     };
 
@@ -386,6 +534,139 @@ const YoneticiEkrani = () => {
         onDeleteCategoryDialogClose();
     };
 
+    const handleDeleteApplication = (applicationId) => {
+        setApplicationToDelete(applicationId);
+        onDeleteApplicationDialogOpen();
+    };
+
+    const confirmDeleteApplication = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.delete(`/api/yonetici/applications/${applicationToDelete}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                toast({
+                    title: 'Başarılı',
+                    description: 'Başvuru başarıyla silindi.',
+                    status: 'success',
+                    duration: 3000,
+                    isClosable: true,
+                });
+
+                // Başvuru listesini güncelle
+                setApplications(applications.filter(app => app._id !== applicationToDelete));
+                
+                // Dashboard istatistiklerini güncelle
+                fetchDashboardData();
+            } else {
+                throw new Error(response.data.error || 'Silme işlemi başarısız');
+            }
+
+            onDeleteApplicationDialogClose();
+        } catch (err) {
+            console.error('Application deletion error:', err);
+            toast({
+                title: 'Hata',
+                description: err.response?.data?.error || 'Başvuru silinirken bir hata oluştu',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+            onDeleteApplicationDialogClose();
+        }
+    };
+
+    const openJuryModal = async (applicationId) => {
+        setSelectedApplicationId(applicationId);
+        setNewJury({ juryMembers: [] });
+        await fetchAvailableJurors();
+        await fetchAssignedJurors(applicationId);
+        onJuryModalOpen();
+    };
+
+    const addJuryMember = () => {
+        setNewJury({
+            ...newJury,
+            juryMembers: [...newJury.juryMembers, { user_id: '', role: 'Üye' }]
+        });
+    };
+
+    const removeJuryMember = (index) => {
+        const updatedMembers = [...newJury.juryMembers];
+        updatedMembers.splice(index, 1);
+        setNewJury({ ...newJury, juryMembers: updatedMembers });
+    };
+
+    const updateJuryMember = (index, field, value) => {
+        const updatedMembers = [...newJury.juryMembers];
+        updatedMembers[index] = {
+            ...updatedMembers[index],
+            [field]: value
+        };
+        setNewJury({ ...newJury, juryMembers: updatedMembers });
+    };
+
+    const handleDeleteJuror = (evaluationId) => {
+        setJurorToDelete(evaluationId);
+        onDeleteJurorDialogOpen();
+    };
+
+    const confirmDeleteJuror = async () => {
+        try {
+            setRemovingJuror(true);
+            const token = localStorage.getItem('token');
+            await axios.delete(`/api/yonetici/evaluations/${jurorToDelete}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            toast({
+                title: 'Başarılı',
+                description: 'Jüri üyesi başarıyla kaldırıldı',
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+            });
+
+            // Refresh data
+            await fetchAssignedJurors(selectedApplicationId);
+            await fetchDashboardData();
+            
+            // Refresh applications list to show updated status
+            const currentPostId = applications.length > 0 ? applications[0].ilan_id : null;
+            if (currentPostId) {
+                await fetchApplications(currentPostId);
+            }
+            
+            onDeleteJurorDialogClose();
+            setRemovingJuror(false);
+        } catch (err) {
+            console.error('Error removing juror:', err);
+            toast({
+                title: 'Hata',
+                description: err.response?.data?.error || 'Jüri üyesi kaldırılırken bir hata oluştu',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+            setRemovingJuror(false);
+        }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('token');
+        navigate('/');
+        toast({
+            title: 'Çıkış Yapıldı',
+            description: 'Başarıyla çıkış yaptınız.',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+        });
+    };
+
     if (loading) {
         return (
             <Center h="100vh">
@@ -395,207 +676,435 @@ const YoneticiEkrani = () => {
     }
 
     return (
-        <Box p={4}>
-            <Heading mb={6}>Yönetici Paneli</Heading>
+        <Box minH="100vh" bg={theme.light}>
+            {/* Hero Section */}
+            <Box bg={theme.primary} color="white" py={8} mb={8} boxShadow="lg" position="relative" overflow="hidden">
+                {/* Decorative Elements */}
+                <Box 
+                    position="absolute" 
+                    top="-50px" 
+                    right="-50px" 
+                    bg={`${theme.secondary}30`}
+                    borderRadius="full" 
+                    w="200px" 
+                    h="200px"
+                    zIndex="0"
+                />
+                <Box 
+                    position="absolute" 
+                    bottom="-30px" 
+                    left="-30px" 
+                    bg={`${theme.tertiary}30`}
+                    borderRadius="full" 
+                    w="150px" 
+                    h="150px"
+                    zIndex="0"
+                />
 
-            {/* Dashboard Stats */}
-            <Grid templateColumns="repeat(4, 1fr)" gap={6} mb={8}>
-                <Card>
-                    <CardBody>
-                        <Stat>
-                            <StatLabel>Toplam İlan</StatLabel>
-                            <StatNumber>{stats.totalPosts}</StatNumber>
-                        </Stat>
-                    </CardBody>
-                </Card>
-                <Card>
-                    <CardBody>
-                        <Stat>
-                            <StatLabel>Toplam Başvuru</StatLabel>
-                            <StatNumber>{stats.totalApplications}</StatNumber>
-                        </Stat>
-                    </CardBody>
-                </Card>
-                <Card>
-                    <CardBody>
-                        <Stat>
-                            <StatLabel>Bekleyen Başvuru</StatLabel>
-                            <StatNumber>{stats.pendingApplications}</StatNumber>
-                        </Stat>
-                    </CardBody>
-                </Card>
-                <Card>
-                    <CardBody>
-                        <Stat>
-                            <StatLabel>Juri Değerlendirmesinde</StatLabel>
-                            <StatNumber>{stats.applicationsInJury}</StatNumber>
-                        </Stat>
-                    </CardBody>
-                </Card>
-            </Grid>
+                <Container maxW="container.xl" position="relative" zIndex="1">
+                    <Flex justify="space-between" align="center">
+                        <Box textAlign="center" flexGrow={1}>
+                            <Heading size="xl" mb={4}>Yönetici Paneli</Heading>
+                            <Divider my={4} borderColor={theme.tertiary} width="60%" mx="auto" opacity="0.5" />
+                            <Text fontSize="lg">Akademik başvuru yönetim ve değerlendirme sistemi</Text>
+                        </Box>
+                        <Tooltip label="Çıkış Yap" placement="bottom">
+                            <IconButton
+                                icon={<Icon as={FaSignOutAlt} />}
+                                aria-label="Çıkış Yap"
+                                variant="ghost"
+                                color="white"
+                                _hover={{ bg: `${theme.secondary}90` }}
+                                onClick={handleLogout}
+                                borderRadius="md"
+                                size="md"
+                            />
+                        </Tooltip>
+                    </Flex>
+                </Container>
+            </Box>
 
-            {/* Main Content Tabs */}
-            <Tabs>
-                <TabList>
-                    <Tab>Kriter Yönetimi</Tab>
-                    <Tab>Başvurular</Tab>
-                    <Tab>Jüri Atamaları</Tab>
-                </TabList>
+            <Container maxW="container.xl" py={4}>
+                {/* Dashboard Stats */}
+                <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6} mb={8}>
+                    <Card bg="white" boxShadow="md" borderRadius="lg">
+                        <CardBody>
+                            <Stat>
+                                <Flex align="center" mb={4}>
+                                    <Flex 
+                                        bg={`${theme.primary}20`} 
+                                        p={2} 
+                                        borderRadius="full" 
+                                        color={theme.primary}
+                                        mr={3}
+                                        boxSize="40px"
+                                        alignItems="center"
+                                        justifyContent="center"
+                                    >
+                                        <Icon as={FaFileAlt} boxSize="20px" />
+                                    </Flex>
+                                    <StatLabel fontSize="lg">Toplam İlan</StatLabel>
+                                </Flex>
+                                <StatNumber fontSize="3xl" color={theme.primary}>{stats.totalPosts}</StatNumber>
+                                <StatHelpText>Aktif ve pasif tüm ilanlar</StatHelpText>
+                            </Stat>
+                        </CardBody>
+                    </Card>
 
-                <TabPanels>
-                    {/* Kriter Yönetimi Tab */}
-                    <TabPanel>
-                        <Button colorScheme="blue" mb={4} onClick={onCriteriaModalOpen}>
-                            Yeni Kriter Oluştur
-                        </Button>
+                    <Card bg="white" boxShadow="md" borderRadius="lg">
+                        <CardBody>
+                            <Stat>
+                                <Flex align="center" mb={4}>
+                                    <Flex 
+                                        bg={`${theme.info}20`} 
+                                        p={2} 
+                                        borderRadius="full" 
+                                        color={theme.info}
+                                        mr={3}
+                                        boxSize="40px"
+                                        alignItems="center"
+                                        justifyContent="center"
+                                    >
+                                        <Icon as={FaUsers} boxSize="20px" />
+                                    </Flex>
+                                    <StatLabel fontSize="lg">Toplam Başvuru</StatLabel>
+                                </Flex>
+                                <StatNumber fontSize="3xl" color={theme.info}>{stats.totalApplications}</StatNumber>
+                                <StatHelpText>Tüm başvurular</StatHelpText>
+                            </Stat>
+                        </CardBody>
+                    </Card>
 
-                        <Table variant="simple">
-                            <Thead>
-                                <Tr>
-                                    <Th>Pozisyon</Th>
-                                    <Th>Kriterler</Th>
-                                    <Th>Minimum Puan</Th>
-                                    <Th>İşlemler</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {criteria.map((item) => (
-                                    <Tr key={item._id}>
-                                        <Td>{item.position_type}</Td>
-                                        <Td>
-                                            {item.criteria.map((cat) => (
-                                                <Box key={cat.category} mb={2}>
-                                                    <Text fontWeight="bold">{cat.category}</Text>
-                                                    {cat.sub_criteria.map((sub) => (
-                                                        <Text key={sub.title} ml={4}>
-                                                            - {sub.title} ({sub.points} puan)
-                                                        </Text>
-                                                    ))}
-                                                </Box>
+                    <Card bg="white" boxShadow="md" borderRadius="lg">
+                        <CardBody>
+                            <Stat>
+                                <Flex align="center" mb={4}>
+                                    <Flex 
+                                        bg={`${theme.warning}20`} 
+                                        p={2} 
+                                        borderRadius="full" 
+                                        color={theme.warning}
+                                        mr={3}
+                                        boxSize="40px"
+                                        alignItems="center"
+                                        justifyContent="center"
+                                    >
+                                        <Icon as={FaClock} boxSize="20px" />
+                                    </Flex>
+                                    <StatLabel fontSize="lg">Bekleyen Başvuru</StatLabel>
+                                </Flex>
+                                <StatNumber fontSize="3xl" color={theme.warning}>{stats.pendingApplications}</StatNumber>
+                                <StatHelpText>Değerlendirme bekleyen</StatHelpText>
+                            </Stat>
+                        </CardBody>
+                    </Card>
+
+                    <Card bg="white" boxShadow="md" borderRadius="lg">
+                        <CardBody>
+                            <Stat>
+                                <Flex align="center" mb={4}>
+                                    <Flex 
+                                        bg={`${theme.tertiary}20`} 
+                                        p={2} 
+                                        borderRadius="full" 
+                                        color={theme.tertiary}
+                                        mr={3}
+                                        boxSize="40px"
+                                        alignItems="center"
+                                        justifyContent="center"
+                                    >
+                                        <Icon as={FaClipboardCheck} boxSize="20px" />
+                                    </Flex>
+                                    <StatLabel fontSize="lg">Jüri Değerlendirmesinde</StatLabel>
+                                </Flex>
+                                <StatNumber fontSize="3xl" color={theme.tertiary}>{stats.applicationsInJury}</StatNumber>
+                                <StatHelpText>Aktif değerlendirmeler</StatHelpText>
+                            </Stat>
+                        </CardBody>
+                    </Card>
+                </SimpleGrid>
+
+                {/* Main Content */}
+                <Card borderRadius="lg" boxShadow="md" bg="white" overflow="hidden" position="relative">
+                    <Box 
+                        position="absolute" 
+                        top="-30px" 
+                        right="-30px" 
+                        bg={`${theme.tertiary}10`}
+                        borderRadius="full" 
+                        w="120px" 
+                        h="120px"
+                        zIndex="0"
+                    />
+                    <CardBody p={6}>
+                        <Tabs variant="soft-rounded" colorScheme="blue">
+                            <TabList mb={4}>
+                                <Tab>
+                                    <HStack spacing={2}>
+                                        <Icon as={FaCog} />
+                                        <Text>Kriter Yönetimi</Text>
+                                    </HStack>
+                                </Tab>
+                                <Tab>
+                                    <HStack spacing={2}>
+                                        <Icon as={FaFileAlt} />
+                                        <Text>Başvurular</Text>
+                                    </HStack>
+                                </Tab>
+                                <Tab>
+                                    <HStack spacing={2}>
+                                        <Icon as={FaUsers} />
+                                        <Text>Jüri Atamaları</Text>
+                                    </HStack>
+                                </Tab>
+                            </TabList>
+
+                            <TabPanels>
+                                {/* Kriter Yönetimi Tab */}
+                                <TabPanel>
+                                    <Button 
+                                        colorScheme="blue" 
+                                        mb={4} 
+                                        onClick={onCriteriaModalOpen}
+                                        bg={theme.primary}
+                                        _hover={{ bg: theme.info }}
+                                        leftIcon={<Icon as={FaPlus} />}
+                                    >
+                                        Yeni Kriter Oluştur
+                                    </Button>
+
+                                    <Table variant="simple">
+                                        <Thead>
+                                            <Tr>
+                                                <Th>Pozisyon</Th>
+                                                <Th>Kriterler</Th>
+                                                <Th>Minimum Puan</Th>
+                                                <Th>İşlemler</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {criteria.map((item) => (
+                                                <Tr key={item._id}>
+                                                    <Td>{item.position_type}</Td>
+                                                    <Td>
+                                                        {item.criteria.map((cat) => (
+                                                            <Box key={cat.category} mb={2}>
+                                                                <Text fontWeight="bold">{cat.category}</Text>
+                                                                {cat.sub_criteria.map((sub) => (
+                                                                    <Text key={sub.title} ml={4}>
+                                                                        - {sub.title} ({sub.points} puan)
+                                                                    </Text>
+                                                                ))}
+                                                            </Box>
+                                                        ))}
+                                                    </Td>
+                                                    <Td>{item.total_minimum_points}</Td>
+                                                    <Td>
+                                                        <HStack spacing={2}>
+                                                            <Button 
+                                                                size="sm" 
+                                                                colorScheme="blue" 
+                                                                onClick={() => handleEditCriteria(item)}
+                                                                leftIcon={<Icon as={FaEdit} />}
+                                                            >
+                                                                Düzenle
+                                                            </Button>
+                                                            <Button 
+                                                                size="sm" 
+                                                                colorScheme="red"
+                                                                onClick={() => handleDeleteCriteria(item._id)}
+                                                                leftIcon={<Icon as={FaTrash} />}
+                                                            >
+                                                                Sil
+                                                            </Button>
+                                                        </HStack>
+                                                    </Td>
+                                                </Tr>
                                             ))}
-                                        </Td>
-                                        <Td>{item.total_minimum_points}</Td>
-                                        <Td>
-                                            <Button 
-                                                size="sm" 
-                                                colorScheme="blue" 
-                                                mr={2}
-                                                onClick={() => handleEditCriteria(item)}
-                                            >
-                                                Düzenle
-                                            </Button>
-                                            <Button 
-                                                size="sm" 
-                                                colorScheme="red"
-                                                onClick={() => handleDeleteCriteria(item._id)}
-                                            >
-                                                Sil
-                                            </Button>
-                                        </Td>
-                                    </Tr>
-                                ))}
-                            </Tbody>
-                        </Table>
-                    </TabPanel>
+                                        </Tbody>
+                                    </Table>
+                                </TabPanel>
 
-                    {/* Başvurular Tab */}
-                    <TabPanel>
-                        <Select
-                            placeholder="İlan Seçin"
-                            mb={4}
-                            onChange={(e) => {
-                                const postId = e.target.value;
-                                if (postId) {
-                                    fetchApplications(postId);
-                                }
-                            }}
-                        >
-                            {posts.map((post) => (
-                                <option key={post._id} value={post._id}>
-                                    {post.ilan_basligi} - {post.kademe}
-                                </option>
-                            ))}
-                        </Select>
+                                {/* Başvurular Tab */}
+                                <TabPanel>
+                                    <Select
+                                        placeholder="İlan Seçin"
+                                        mb={4}
+                                        onChange={(e) => {
+                                            const postId = e.target.value;
+                                            if (postId) {
+                                                fetchApplications(postId);
+                                            }
+                                        }}
+                                    >
+                                        {posts.map((post) => (
+                                            <option key={post._id} value={post._id}>
+                                                {post.ilan_basligi} - {post.kademe}
+                                            </option>
+                                        ))}
+                                    </Select>
 
-                        {loading ? (
-                            <Center>
-                                <Spinner size="xl" />
-                            </Center>
-                        ) : applications.length > 0 ? (
-                            <Table variant="simple">
-                                <Thead>
-                                    <Tr>
-                                        <Th>Aday</Th>
-                                        <Th>Başvuru Tarihi</Th>
-                                        <Th>Durum</Th>
-                                        <Th>İşlemler</Th>
-                                    </Tr>
-                                </Thead>
-                                <Tbody>
-                                    {applications.map((app) => (
-                                        <Tr key={app._id}>
-                                            <Td>{app.user?.ad} {app.user?.soyad}</Td>
-                                            <Td>{new Date(app.created_at).toLocaleDateString('tr-TR')}</Td>
-                                            <Td>
-                                                <Badge colorScheme={getStatusColor(app.durum)}>
-                                                    {app.durum}
-                                                </Badge>
-                                            </Td>
-                                            <Td>
-                                                <Button
-                                                    size="sm"
-                                                    colorScheme="blue"
-                                                    mr={2}
-                                                    onClick={() => handleGenerateTable5(app._id)}
-                                                >
-                                                    <FaFilePdf /> Tablo 5
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    colorScheme="green"
-                                                    onClick={() => {
-                                                        setNewJury({ ...newJury, postId: app.ilan_id });
-                                                        onJuryModalOpen();
-                                                    }}
-                                                >
-                                                    <FaUsers /> Jüri Ata
-                                                </Button>
-                                            </Td>
-                                        </Tr>
-                                    ))}
-                                </Tbody>
-                            </Table>
-                        ) : (
-                            <Alert status="info" borderRadius="md">
-                                <AlertIcon />
-                                <Box>
-                                    <AlertTitle>Bilgi</AlertTitle>
-                                    <AlertDescription>
-                                        Seçilen ilan için henüz başvuru bulunmamaktadır.
-                                    </AlertDescription>
-                                </Box>
-                            </Alert>
-                        )}
-                    </TabPanel>
+                                    {loading ? (
+                                        <Center p={8}>
+                                            <Spinner size="xl" color={theme.primary} />
+                                        </Center>
+                                    ) : applications.length > 0 ? (
+                                        <Table variant="simple">
+                                            <Thead>
+                                                <Tr>
+                                                    <Th>Aday</Th>
+                                                    <Th>Başvuru Tarihi</Th>
+                                                    <Th>Durum</Th>
+                                                    <Th>İşlemler</Th>
+                                                </Tr>
+                                            </Thead>
+                                            <Tbody>
+                                                {applications.map((app) => (
+                                                    <Tr key={app._id}>
+                                                        <Td>{app.aday_id?.ad} {app.aday_id?.soyad}</Td>
+                                                        <Td>{new Date(app.created_at).toLocaleDateString('tr-TR')}</Td>
+                                                        <Td>
+                                                            <Badge 
+                                                                colorScheme={
+                                                                    app.durum_gecmisi?.[0]?.durum === 'Tamamlandı' ? 'green' :
+                                                                    app.durum_gecmisi?.[0]?.durum === 'Beklemede' ? 'yellow' :
+                                                                    'blue'
+                                                                }
+                                                                borderRadius="md"
+                                                                px={2}
+                                                                py={1}
+                                                            >
+                                                                {app.durum_gecmisi?.[0]?.durum || 'Beklemede'}
+                                                            </Badge>
+                                                        </Td>
+                                                        <Td>
+                                                            <HStack spacing={2}>
+                                                                <Button
+                                                                    size="sm"
+                                                                    colorScheme="teal"
+                                                                    onClick={() => handleGenerateAtamaYonergesi(app._id)}
+                                                                    leftIcon={<Icon as={FaFilePdf} />}
+                                                                >
+                                                                    Önizleme PDF
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    colorScheme="green"
+                                                                    onClick={() => openJuryModal(app._id)}
+                                                                    leftIcon={<Icon as={FaUsers} />}
+                                                                >
+                                                                    Jüri Ata
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    colorScheme="red"
+                                                                    onClick={() => handleDeleteApplication(app._id)}
+                                                                    leftIcon={<Icon as={FaTrash} />}
+                                                                >
+                                                                    Sil
+                                                                </Button>
+                                                            </HStack>
+                                                        </Td>
+                                                    </Tr>
+                                                ))}
+                                            </Tbody>
+                                        </Table>
+                                    ) : (
+                                        <Alert status="info" borderRadius="md">
+                                            <AlertIcon />
+                                            <Box>
+                                                <AlertTitle>Bilgi</AlertTitle>
+                                                <AlertDescription>
+                                                    Seçilen ilan için henüz başvuru bulunmamaktadır.
+                                                </AlertDescription>
+                                            </Box>
+                                        </Alert>
+                                    )}
+                                </TabPanel>
 
-                    {/* Jüri Atamaları Tab */}
-                    <TabPanel>
-                        <Table variant="simple">
-                            <Thead>
-                                <Tr>
-                                    <Th>İlan</Th>
-                                    <Th>Jüri Üyeleri</Th>
-                                    <Th>Atama Tarihi</Th>
-                                    <Th>Durum</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {/* Add jury assignments data here */}
-                            </Tbody>
-                        </Table>
-                    </TabPanel>
-                </TabPanels>
-            </Tabs>
+                                {/* Jüri Atamaları Tab */}
+                                <TabPanel>
+                                    <Select
+                                        placeholder="İlan Seçin"
+                                        mb={4}
+                                        onChange={(e) => {
+                                            const postId = e.target.value;
+                                            if (postId) {
+                                                fetchApplications(postId);
+                                            }
+                                        }}
+                                    >
+                                        {posts.map((post) => (
+                                            <option key={post._id} value={post._id}>
+                                                {post.ilan_basligi} - {post.kademe}
+                                            </option>
+                                        ))}
+                                    </Select>
+
+                                    {loading ? (
+                                        <Center p={8}>
+                                            <Spinner size="xl" color={theme.primary} />
+                                        </Center>
+                                    ) : applications.length > 0 ? (
+                                        <Table variant="simple">
+                                            <Thead>
+                                                <Tr>
+                                                    <Th>Aday</Th>
+                                                    <Th>Başvuru Tarihi</Th>
+                                                    <Th>Atanmış Jüri Üyeleri</Th>
+                                                    <Th>İşlemler</Th>
+                                                </Tr>
+                                            </Thead>
+                                            <Tbody>
+                                                {applications.map((app) => (
+                                                    <Tr key={app._id}>
+                                                        <Td>{app.aday_id?.ad} {app.aday_id?.soyad}</Td>
+                                                        <Td>{new Date(app.created_at).toLocaleDateString('tr-TR')}</Td>
+                                                        <Td>
+                                                            <Button 
+                                                                size="sm" 
+                                                                colorScheme="blue"
+                                                                onClick={() => {
+                                                                    fetchAssignedJurors(app._id);
+                                                                    setSelectedApplicationId(app._id);
+                                                                    onJuryModalOpen();
+                                                                }}
+                                                                leftIcon={<Icon as={FaUsers} />}
+                                                            >
+                                                                Jüri Üyelerini Görüntüle
+                                                            </Button>
+                                                        </Td>
+                                                        <Td>
+                                                            <Button
+                                                                size="sm"
+                                                                colorScheme="green"
+                                                                onClick={() => openJuryModal(app._id)}
+                                                                leftIcon={<Icon as={FaUserPlus} />}
+                                                            >
+                                                                Jüri Ekle
+                                                            </Button>
+                                                        </Td>
+                                                    </Tr>
+                                                ))}
+                                            </Tbody>
+                                        </Table>
+                                    ) : (
+                                        <Alert status="info" borderRadius="md">
+                                            <AlertIcon />
+                                            <Box>
+                                                <AlertTitle>Bilgi</AlertTitle>
+                                                <AlertDescription>
+                                                    Seçilen ilan için henüz başvuru bulunmamaktadır.
+                                                </AlertDescription>
+                                            </Box>
+                                        </Alert>
+                                    )}
+                                </TabPanel>
+                            </TabPanels>
+                        </Tabs>
+                    </CardBody>
+                </Card>
+            </Container>
 
             {/* Kriter Oluşturma Modal */}
             <Modal isOpen={isCriteriaModalOpen} onClose={onCriteriaModalClose} size="xl">
@@ -651,46 +1160,105 @@ const YoneticiEkrani = () => {
                     <ModalHeader>Jüri Atama</ModalHeader>
                     <ModalCloseButton />
                     <ModalBody>
-                        <VStack spacing={4}>
-                            {newJury.members.map((member, index) => (
-                                <HStack key={index} width="100%">
-                                    <FormControl>
-                                        <FormLabel>Jüri Üyesi {index + 1}</FormLabel>
-                                        <Select
-                                            placeholder="Jüri Üyesi Seçin"
-                                            value={member.user_id}
-                                            onChange={(e) => {
-                                                const updatedMembers = [...newJury.members];
-                                                updatedMembers[index] = {
-                                                    ...updatedMembers[index],
-                                                    user_id: e.target.value
-                                                };
-                                                setNewJury({ ...newJury, members: updatedMembers });
-                                            }}
+                        <VStack spacing={4} align="stretch">
+                            {/* Mevcut atanmış jüri üyeleri */}
+                            {assignedJurors.length > 0 && (
+                                <Box>
+                                    <Heading size="md" mb={2}>Atanmış Jüri Üyeleri</Heading>
+                                    <Table variant="simple" size="sm">
+                                        <Thead>
+                                            <Tr>
+                                                <Th>Ad Soyad</Th>
+                                                <Th>Email</Th>
+                                                <Th>Departman</Th>
+                                                <Th>Durum</Th>
+                                                <Th>İşlemler</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {assignedJurors.map((juror) => (
+                                                <Tr key={juror._id}>
+                                                    <Td>{juror.juror_id?.ad} {juror.juror_id?.soyad}</Td>
+                                                    <Td>{juror.juror_id?.email}</Td>
+                                                    <Td>{juror.juror_id?.department}</Td>
+                                                    <Td>
+                                                        <Badge 
+                                                            colorScheme={
+                                                                juror.status === 'Tamamlandı' ? 'green' : 
+                                                                juror.status === 'Değerlendirme Devam Ediyor' ? 'blue' : 'yellow'
+                                                            }
+                                                        >
+                                                            {juror.status}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>
+                                                        <Button
+                                                            size="xs"
+                                                            colorScheme="red"
+                                                            leftIcon={<DeleteIcon />}
+                                                            isDisabled={juror.status !== 'Beklemede'}
+                                                            onClick={() => handleDeleteJuror(juror._id)}
+                                                        >
+                                                            Kaldır
+                                                        </Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            )}
+
+                            {/* Yeni jüri üyesi atama formu */}
+                            <Box>
+                                <Heading size="md" mb={2}>Yeni Jüri Üyesi Ekle</Heading>
+                                
+                                {newJury.juryMembers.map((member, index) => (
+                                    <HStack key={index} spacing={4} mt={2} align="flex-end">
+                                        <FormControl>
+                                            <FormLabel>Jüri Üyesi {index + 1}</FormLabel>
+                                            <Select
+                                                placeholder="Jüri Üyesi Seçin"
+                                                value={member.user_id}
+                                                onChange={(e) => updateJuryMember(index, 'user_id', e.target.value)}
+                                            >
+                                                {availableJurors.map(juror => (
+                                                    <option key={juror._id} value={juror._id}>
+                                                        {juror.ad} {juror.soyad} - {juror.department}
+                                                    </option>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                        <FormControl width="150px">
+                                            <FormLabel>Rolü</FormLabel>
+                                            <Select
+                                                value={member.role || 'Üye'}
+                                                onChange={(e) => updateJuryMember(index, 'role', e.target.value)}
+                                            >
+                                                <option value="Başkan">Başkan</option>
+                                                <option value="Üye">Üye</option>
+                                            </Select>
+                                        </FormControl>
+                                        <Button 
+                                            colorScheme="red" 
+                                            onClick={() => removeJuryMember(index)}
                                         >
-                                            {/* Add jury member options dynamically */}
-                                        </Select>
-                                    </FormControl>
-                                    <FormControl>
-                                        <FormLabel>Rol</FormLabel>
-                                        <Select
-                                            value={member.role}
-                                            onChange={(e) => {
-                                                const updatedMembers = [...newJury.members];
-                                                updatedMembers[index] = {
-                                                    ...updatedMembers[index],
-                                                    role: e.target.value
-                                                };
-                                                setNewJury({ ...newJury, members: updatedMembers });
-                                            }}
-                                        >
-                                            <option value="Başkan">Başkan</option>
-                                            <option value="Üye">Üye</option>
-                                        </Select>
-                                    </FormControl>
-                                </HStack>
-                            ))}
-                            <Button colorScheme="blue" onClick={handleAssignJury}>
+                                            <DeleteIcon />
+                                        </Button>
+                                    </HStack>
+                                ))}
+
+                                <Button mt={4} onClick={addJuryMember} leftIcon={<FaUserPlus />}>
+                                    Jüri Üyesi Ekle
+                                </Button>
+                            </Box>
+
+                            <Button 
+                                colorScheme="blue" 
+                                isDisabled={newJury.juryMembers.length === 0 || newJury.juryMembers.some(m => !m.user_id)}
+                                onClick={handleAssignJury}
+                                mt={4}
+                            >
                                 Jüri Ata
                             </Button>
                         </VStack>
@@ -900,6 +1468,70 @@ const YoneticiEkrani = () => {
                             </Button>
                             <Button colorScheme="red" onClick={confirmDeleteCategory} ml={3}>
                                 Sil
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
+
+            {/* Başvuru Silme Onay Dialog */}
+            <AlertDialog
+                isOpen={isDeleteApplicationDialogOpen}
+                leastDestructiveRef={cancelApplicationRef}
+                onClose={onDeleteApplicationDialogClose}
+            >
+                <AlertDialogOverlay>
+                    <AlertDialogContent>
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                            Başvuruyu Sil
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody>
+                            Bu başvuruyu silmek istediğinizden emin misiniz? 
+                            Bu işlem geri alınamaz ve başvuruyla ilişkili tüm belgeler silinecektir.
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelApplicationRef} onClick={onDeleteApplicationDialogClose}>
+                                İptal
+                            </Button>
+                            <Button colorScheme="red" onClick={confirmDeleteApplication} ml={3}>
+                                Sil
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
+
+            {/* Jüri Silme Onay Dialog */}
+            <AlertDialog
+                isOpen={isDeleteJurorDialogOpen}
+                leastDestructiveRef={cancelRef}
+                onClose={onDeleteJurorDialogClose}
+            >
+                <AlertDialogOverlay>
+                    <AlertDialogContent>
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                            Jüri Üyesini Kaldır
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody>
+                            Bu jüri üyesini başvurudan kaldırmak istediğinizden emin misiniz?
+                            Bu işlem geri alınamaz.
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelRef} onClick={onDeleteJurorDialogClose} isDisabled={removingJuror}>
+                                İptal
+                            </Button>
+                            <Button 
+                                colorScheme="red" 
+                                onClick={confirmDeleteJuror} 
+                                ml={3}
+                                isLoading={removingJuror}
+                                loadingText="Kaldırılıyor..."
+                            >
+                                Kaldır
                             </Button>
                         </AlertDialogFooter>
                     </AlertDialogContent>

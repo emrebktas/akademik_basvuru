@@ -7,6 +7,8 @@ const AcademicPost = require('../db/models/AcademicPost');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
+const Publication = require('../db/models/Publication');
 
 // Dosya yükleme için klasör oluştur
 const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -52,6 +54,8 @@ router.get('/my-applications', authMiddleware, async (req, res) => {
             .populate('ilan_id')
             .sort({ 'durum_gecmisi.0.tarih': -1 }); // En son başvurulan ilk sırada
 
+        console.log(`Fetched ${applications.length} applications for user ${req.user._id}`);
+
         // Her başvuru için belgeleri getir
         const result = await Promise.all(applications.map(async (app) => {
             const documents = await ApplicationDocument.find({ 
@@ -70,6 +74,7 @@ router.get('/my-applications', authMiddleware, async (req, res) => {
             };
         }));
 
+        console.log(`Returning ${result.length} applications with details`);
         res.status(200).json(result);
     } catch (error) {
         console.error('Error fetching applications:', error);
@@ -277,6 +282,29 @@ router.get('/public-posts', async (req, res) => {
     }
 });
 
+// Yeni eklenen - Ana sayfa için aktif ilanları getiren public endpoint
+router.get('/public-active-posts', async (req, res) => {
+    try {
+        console.log('Public active posts endpoint çağrıldı');
+        const currentDate = new Date();
+
+        // Aktif ilanları getir (durum=Açık ve başvuru tarihleri uygun)
+        const activePosts = await AcademicPost.find({
+            durum: 'Açık',
+            basvuru_baslangic_tarihi: { $lte: currentDate },
+            basvuru_bitis_tarihi: { $gte: currentDate }
+        }).sort({ basvuru_bitis_tarihi: 1 }); // Bitiş tarihine göre sırala
+        
+        console.log('Bulunan public active posts sayısı:', activePosts.length);
+        
+        // İlanları döndür
+        res.status(200).json(activePosts);
+    } catch (error) {
+        console.error('Error fetching public active posts:', error);
+        res.status(500).json({ message: 'Sunucu hatası.' });
+    }
+});
+
 // Adaylar için açık ilanları getiren endpoint
 router.get('/get-active-posts', authMiddleware, async (req, res) => {
     try {
@@ -347,12 +375,14 @@ router.get('/applications-by-post/:postId', authMiddleware, async (req, res) => 
 
 router.post('/create-post', authMiddleware, async (req, res) => {
     try {
+        // Verify admin role
         if (req.user.rol !== 'Admin') {
             return res.status(403).json({ 
                 message: 'Bu işlem için yetkiniz bulunmamaktadır.' 
             });
         }
 
+        // Extract fields from request body
         const { 
             ilan_basligi, 
             ilan_aciklamasi, 
@@ -360,17 +390,31 @@ router.post('/create-post', authMiddleware, async (req, res) => {
             basvuru_baslangic_tarihi, 
             basvuru_bitis_tarihi, 
             department,
-            criteria,
+            fieldGroup,
             required_documents
         } = req.body;
 
+        // Set criteria to fieldGroup if not explicitly provided
+        const criteria = req.body.criteria || fieldGroup;
+
+        // Validate required fields
         if (!ilan_basligi || !ilan_aciklamasi || !kademe || !basvuru_baslangic_tarihi || 
-            !basvuru_bitis_tarihi || !department || !criteria) {
+            !basvuru_bitis_tarihi || !department || !fieldGroup) {
             return res.status(400).json({
-                message: 'Lütfen gerekli tüm alanları doldurun.'
+                message: 'Lütfen gerekli tüm alanları doldurun.',
+                missingFields: {
+                    ilan_basligi: !ilan_basligi,
+                    ilan_aciklamasi: !ilan_aciklamasi,
+                    kademe: !kademe,
+                    basvuru_baslangic_tarihi: !basvuru_baslangic_tarihi,
+                    basvuru_bitis_tarihi: !basvuru_bitis_tarihi,
+                    department: !department,
+                    fieldGroup: !fieldGroup
+                }
             });
         }
 
+        // Validate kademe
         const validKademe = ['Dr. Öğr. Üyesi', 'Doçent', 'Profesör'];
         if (!validKademe.includes(kademe)) {
             return res.status(400).json({
@@ -378,6 +422,16 @@ router.post('/create-post', authMiddleware, async (req, res) => {
             });
         }
 
+        // Validate fieldGroup
+        const validFieldGroups = ['saglik-fen', 'egitim-sosyal', 'hukuk-ilahiyat', 'guzel-sanatlar'];
+        if (!validFieldGroups.includes(fieldGroup)) {
+            return res.status(400).json({
+                message: 'Geçersiz alan grubu. Lütfen geçerli bir alan grubu seçin.',
+                validFieldGroups: validFieldGroups
+            });
+        }
+
+        // Create academic post object
         const academicPost = new AcademicPost({
             ilan_basligi,
             ilan_aciklamasi,
@@ -388,22 +442,30 @@ router.post('/create-post', authMiddleware, async (req, res) => {
             created_by: req.user._id,
             required_documents: required_documents || [],
             department,
+            fieldGroup,
             criteria,
             applications_count: 0,
             jury_assigned: false,
             is_active: true
         });
 
-        await academicPost.save();
+        // Save the academic post
+        const savedPost = await academicPost.save();
 
+        // Send success response
         res.status(201).json({ 
             message: 'Akademik ilan başarıyla oluşturuldu.',
-            ilan: academicPost 
+            ilan: savedPost 
         });
 
     } catch (error) {
         console.error('İlan oluşturma hatası:', error);
-        res.status(500).json({ message: 'Sunucu hatası.' });
+        // Send more detailed error response
+        res.status(500).json({ 
+            message: 'İlan oluşturulurken bir hata oluştu.',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
@@ -469,14 +531,39 @@ router.post('/update-post/:id', authMiddleware, async (req, res) => {
             basvuru_baslangic_tarihi, 
             basvuru_bitis_tarihi, 
             durum,
-            required_documents 
+            required_documents,
+            department,
+            fieldGroup 
         } = req.body;
 
-        // Prepare update object with only provided rs
+        // Prepare update object with only provided fields
         const updateData = {};
         
         if (ilan_basligi) updateData.ilan_basligi = ilan_basligi;
         if (ilan_aciklamasi) updateData.ilan_aciklamasi = ilan_aciklamasi;
+        if (department) updateData.department = department;
+        
+        // Validate and update fieldGroup if provided
+        if (fieldGroup) {
+            const validFieldGroups = ['saglik-fen', 'egitim-sosyal', 'hukuk-ilahiyat', 'guzel-sanatlar'];
+            if (!validFieldGroups.includes(fieldGroup)) {
+                return res.status(400).json({
+                    message: 'Geçersiz alan grubu. Lütfen geçerli bir alan grubu seçin.',
+                    validFieldGroups: validFieldGroups
+                });
+            }
+            updateData.fieldGroup = fieldGroup;
+            
+            // Update criteria field to match fieldGroup if not explicitly provided
+            if (!req.body.criteria) {
+                updateData.criteria = fieldGroup;
+            }
+        }
+        
+        // Update criteria if provided explicitly
+        if (req.body.criteria) {
+            updateData.criteria = req.body.criteria;
+        }
         
         // Validate kademe if provided
         if (kademe) {
@@ -492,7 +579,7 @@ router.post('/update-post/:id', authMiddleware, async (req, res) => {
         if (basvuru_baslangic_tarihi) updateData.basvuru_baslangic_tarihi = new Date(basvuru_baslangic_tarihi);
         if (basvuru_bitis_tarihi) updateData.basvuru_bitis_tarihi = new Date(basvuru_bitis_tarihi);
         
-        // Validate durum if provided
+        // Update durum if provided
         if (durum) {
             const validDurum = ['Açık', 'Kapalı', 'Tamamlandı'];
             if (!validDurum.includes(durum)) {
@@ -503,35 +590,28 @@ router.post('/update-post/:id', authMiddleware, async (req, res) => {
             updateData.durum = durum;
         }
         
-        // Validate required_documents if provided
-        if (required_documents) {
-            const validDocumentTypes = ['İndeksli Yayın', 'Atıf Sayısı', 'Konferans Yayını'];
-            const invalidDocuments = required_documents.filter(doc => !validDocumentTypes.includes(doc));
-            if (invalidDocuments.length > 0) {
-                return res.status(400).json({
-                    message: `Geçersiz belge türleri: ${invalidDocuments.join(', ')}. Geçerli değerler: ${validDocumentTypes.join(', ')}`
-                });
-            }
-            updateData.required_documents = required_documents;
-        }
-
+        // Update required_documents if provided
+        if (required_documents) updateData.required_documents = required_documents;
+        
         // Update the academic post
         const updatedPost = await AcademicPost.findByIdAndUpdate(
             postId,
             updateData,
             { new: true, runValidators: true }
         );
-
+        
         // Send success response
         res.status(200).json({
             message: 'Akademik ilan başarıyla güncellendi.',
             ilan: updatedPost
         });
-
     } catch (error) {
-        // Handle any errors
-        console.error('Error during academic post update:', error);
-        res.status(500).json({ message: 'Sunucu hatası.' });
+        console.error('İlan güncelleme hatası:', error);
+        res.status(500).json({ 
+            message: 'İlan güncellenirken bir hata oluştu.',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
@@ -832,6 +912,122 @@ router.put('/update-points/:applicationId', authMiddleware, async (req, res) => 
     } catch (error) {
         console.error('Puan güncelleme hatası:', error);
         res.status(500).json({ message: 'Sunucu hatası' });
+    }
+});
+
+// Get single academic post by ID
+router.get('/post-details/:id', authMiddleware, async (req, res) => {
+    try {
+        const postId = req.params.id;
+        
+        // Find the academic post
+        const academicPost = await AcademicPost.findById(postId);
+        
+        if (!academicPost) {
+            return res.status(404).json({ message: 'İlan bulunamadı.' });
+        }
+        
+        // Return the academic post
+        res.status(200).json(academicPost);
+    } catch (error) {
+        console.error('Error fetching academic post details:', error);
+        res.status(500).json({ message: 'Sunucu hatası.' });
+    }
+});
+
+// Akademik başvuruyu tamamla ve veritabanına kaydet
+router.post('/submit', authMiddleware, async (req, res) => {
+    try {
+        // Sadece aday rolüne sahip kullanıcılar başvuru yapabilir
+        if (req.user.rol !== 'Aday') {
+            return res.status(403).json({
+                success: false,
+                message: 'Bu işlem için yetkiniz bulunmamaktadır. Sadece adaylar başvuru yapabilir.'
+            });
+        }
+
+        const { academic_post, fieldGroup, kademe, languageExam, publications } = req.body;
+
+        // Zorunlu alanları kontrol et
+        if (!academic_post || !fieldGroup || !kademe) {
+            return res.status(400).json({
+                success: false,
+                message: 'Akademik ilan ID, temel alan ve kademe bilgileri zorunludur.'
+            });
+        }
+
+        // İlan kontrolü
+        const academicPost = await AcademicPost.findById(academic_post);
+        if (!academicPost || academicPost.durum !== 'Açık') {
+            return res.status(400).json({
+                success: false,
+                message: 'İlan kapalı veya mevcut değil.'
+            });
+        }
+
+        // Kullanıcının aynı ilana daha önce başvurup başvurmadığını kontrol et
+        const existingApplication = await Application.findOne({
+            ilan_id: academic_post,
+            aday_id: req.user._id
+        });
+
+        if (existingApplication) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bu ilana zaten başvurdunuz.'
+            });
+        }
+
+        // Yeni başvuru oluştur
+        const application = new Application({
+            ilan_id: academic_post,
+            aday_id: req.user._id,
+            durum_gecmisi: [{
+                durum: 'Beklemede',
+                tarih: new Date(),
+                aciklama: 'Dr. Öğretim Üyesi Başvuru Formundan oluşturuldu'
+            }],
+            puan_dagilimi: [{
+                category: 'Temel Alan',
+                criteria: 'Temel Alan',
+                points: 0,
+                field_group: fieldGroup
+            }]
+        });
+
+        // Başvuruyu kaydet
+        await application.save();
+
+        // Yayınları bu başvuruyla ilişkilendir
+        if (publications && publications.length > 0) {
+            await Publication.updateMany(
+                { _id: { $in: publications } },
+                { $set: { application: application._id } }
+            );
+        }
+
+        // İlanın fieldGroup alanını güncelle
+        if (!academicPost.fieldGroup) {
+            academicPost.fieldGroup = fieldGroup;
+            await academicPost.save();
+        }
+
+        // İlan başvuru sayısını güncelle
+        await academicPost.updateApplicationsCount();
+
+        res.status(201).json({
+            success: true,
+            message: 'Başvurunuz başarıyla tamamlandı.',
+            application_id: application._id
+        });
+
+    } catch (error) {
+        console.error('Başvuru tamamlama hatası:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Başvuru tamamlanırken bir hata oluştu.',
+            error: error.message
+        });
     }
 });
 

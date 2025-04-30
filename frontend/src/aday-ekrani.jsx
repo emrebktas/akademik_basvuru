@@ -8,9 +8,16 @@ import {
   Card, CardHeader, CardBody, CardFooter, Flex, Spinner, 
   Alert, AlertIcon, AlertTitle, AlertDescription, Tabs, TabList, 
   Tab, TabPanels, TabPanel, Icon, Stack, Skeleton, Progress, Avatar,
-  FormControl, FormLabel, Input, Select, List, ListItem, ListIcon
+  FormControl, FormLabel, Input, Select, List, ListItem, ListIcon,
+  Center,
+  IconButton,
+  Tooltip
 } from '@chakra-ui/react';
-import { FaFileAlt, FaCheck, FaTimes, FaClock, FaEye, FaPaperPlane, FaUpload, FaFile, FaTrash } from 'react-icons/fa';
+import { 
+  FaFileAlt, FaCheck, FaTimes, FaClock, FaEye, FaPaperPlane, FaUpload, 
+  FaFile, FaTrash, FaUserGraduate, FaCalendarAlt, FaClipboardList, 
+  FaUniversity, FaBell, FaUserCircle, FaSignOutAlt
+} from 'react-icons/fa';
 
 // Kocaeli Üniversitesi tema renkleri
 const theme = {
@@ -27,7 +34,7 @@ const theme = {
 const AdayEkrani = () => {
   const [ilanlar, setIlanlar] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedIlan, setSelectedIlan] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
   const [userApplications, setUserApplications] = useState([]);
   const [activeView, setActiveView] = useState('ilanlar'); // 'ilanlar', 'basvurular', 'form'
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -85,34 +92,56 @@ const AdayEkrani = () => {
   };
 
   const fetchUserApplications = async () => {
-    if (!userId || !token) {
-      console.log('Kullanıcı bilgileri bulunamadı');
-      return;
-    }
-
     try {
-      const response = await axios.get(`/api/applications/my-applications`, {
+      console.log("fetchUserApplications başlatılıyor...");
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/applications/my-applications', {
         headers: {
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
-      setUserApplications(response.data);
+      console.log("Başvurular API yanıtı:", response.data);
+      
+      // Yanıt veri yapısının kontrolü
+      if (Array.isArray(response.data.applications)) {
+        console.log("Bulunan başvuru sayısı:", response.data.applications.length);
+        setUserApplications(response.data.applications);
+        console.log("After setState:", userApplications); // This will show the previous state
+      } else if (response.data && Array.isArray(response.data)) {
+        console.log("Doğrudan dizi olarak dönen başvuru sayısı:", response.data.length);
+        setUserApplications(response.data);
+      } else {
+        console.error("Beklenmeyen API yanıt formatı:", response.data);
+        setUserApplications([]); // Boş bir dizi ile devam et
+        toast({
+          title: "Veri formatı hatası",
+          description: "Başvurularınız beklenmeyen bir formatta döndü. Lütfen daha sonra tekrar deneyin.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
     } catch (error) {
-      console.error('Başvuruları getirirken hata:', error);
+      console.error("Başvurular getirme hatası:", error);
+      console.error("Hata detayları:", error.response?.data || error.message);
+      setUserApplications([]);
       toast({
-        title: 'Hata',
-        description: 'Başvurularınız yüklenirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
+        title: "Başvurular yüklenemedi",
+        description: "Başvurularınız alınırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+        status: "error",
+        duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleIlanClick = (ilan) => {
     try {
       console.log('Selected ilan:', ilan);
-      setSelectedIlan(ilan);
+      setSelectedJob(ilan);
       onOpen();
     } catch (error) {
       console.error('Error in handleIlanClick:', error);
@@ -128,7 +157,7 @@ const AdayEkrani = () => {
 
   const handleApplyClick = async () => {
     try {
-      if (!selectedIlan || !token) {
+      if (!selectedJob || !token) {
         toast({
           title: 'Hata',
           description: 'Başvuru yapabilmek için giriş yapmanız gerekmektedir.',
@@ -141,8 +170,8 @@ const AdayEkrani = () => {
 
       // Check if application period is valid
       const now = new Date();
-      const startDate = new Date(selectedIlan.basvuru_baslangic_tarihi);
-      const endDate = new Date(selectedIlan.basvuru_bitis_tarihi);
+      const startDate = new Date(selectedJob.basvuru_baslangic_tarihi);
+      const endDate = new Date(selectedJob.basvuru_bitis_tarihi);
 
       if (now < startDate) {
         toast({
@@ -167,7 +196,7 @@ const AdayEkrani = () => {
       }
 
       // Check if user has already applied
-      if (hasApplied(selectedIlan._id)) {
+      if (hasApplied(selectedJob._id)) {
         toast({
           title: 'Bilgi',
           description: 'Bu ilana zaten başvurdunuz.',
@@ -180,8 +209,18 @@ const AdayEkrani = () => {
 
       // Başvuru verilerini localStorage'a kaydet
       // Böylece başvuru form sayfasında bu bilgilere erişebiliriz
-      localStorage.setItem('selectedIlanId', selectedIlan._id);
-      localStorage.setItem('selectedIlanTitle', selectedIlan.ilan_basligi);
+      console.log('Debug - selectedJob before localStorage:', selectedJob);
+      console.log('Kademe value:', selectedJob.kademe);
+      
+      localStorage.setItem('selectedJobId', selectedJob._id);
+      localStorage.setItem('selectedJobTitle', selectedJob.ilan_basligi);
+      localStorage.setItem('selectedJobKademe', selectedJob.kademe);
+      
+      // Verify localStorage values were set
+      console.log('Debug - localStorage after setting:');
+      console.log('ID:', localStorage.getItem('selectedJobId'));
+      console.log('Title:', localStorage.getItem('selectedJobTitle'));
+      console.log('Kademe:', localStorage.getItem('selectedJobKademe'));
       
       // Modal'ı kapat
       onClose();
@@ -255,6 +294,19 @@ const AdayEkrani = () => {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('userInfo');
+    localStorage.removeItem('token');
+    navigate('/'); // Navigate to login page
+    toast({
+      title: 'Çıkış Yapıldı',
+      description: 'Başarıyla çıkış yaptınız.',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
   // İlan kartlarını render et
   const renderIlanCards = () => {
     if (loading) {
@@ -299,6 +351,14 @@ const AdayEkrani = () => {
           const applied = hasApplied(ilan._id);
           const status = getApplicationStatus(ilan._id);
           
+          // Kademe'ye göre ikon getiren yardımcı fonksiyon
+          const getKademeIcon = (kademe) => {
+            switch(kademe) {
+              case 'Dr. Öğr. Üyesi': return FaUserGraduate;
+              default: return FaUserGraduate;
+            }
+          };
+          
           return (
             <Card 
               key={ilan._id} 
@@ -311,9 +371,25 @@ const AdayEkrani = () => {
               overflow="hidden"
             >
               <CardHeader bg={applied ? `${theme.light}` : 'white'} borderBottom="1px solid" borderColor="gray.100">
-                <Heading size="md" color={theme.primary}>{ilan.ilan_basligi}</Heading>
+                <Flex alignItems="flex-start" mb={2}>
+                  <Flex 
+                    bg={`${theme.primary}15`} 
+                    p={2} 
+                    borderRadius="md" 
+                    color={theme.primary}
+                    mr={3}
+                    mt={1}
+                  >
+                    <Icon as={getKademeIcon(ilan.kademe)} boxSize="18px" />
+                  </Flex>
+                  <Heading size="md" color={theme.primary}>{ilan.ilan_basligi}</Heading>
+                </Flex>
                 <HStack mt={2} spacing={2} flexWrap="wrap">
                   <Badge bg={theme.primary} color="white" borderRadius="md" px={2} py={1}>{ilan.kademe}</Badge>
+                  <Badge bg={theme.tertiary} color="white" borderRadius="md" px={2} py={1} display="flex" alignItems="center">
+                    <Icon as={FaCalendarAlt} mr={1} boxSize="12px" />
+                    {new Date(ilan.basvuru_bitis_tarihi).toLocaleDateString('tr-TR', {day: '2-digit', month: '2-digit'})}
+                  </Badge>
                   {applied && getStatusBadge(status)}
                 </HStack>
               </CardHeader>
@@ -328,6 +404,7 @@ const AdayEkrani = () => {
                   onClick={() => handleIlanClick(ilan)}
                   _hover={{ bg: theme.info }}
                   boxShadow="sm"
+                  w="full"
                 >
                   Detayları Görüntüle
                 </Button>
@@ -341,78 +418,160 @@ const AdayEkrani = () => {
 
   // Kullanıcı başvurularını render et
   const renderUserApplications = () => {
-    // Ensure userApplications is an array
-    const userAppsArray = Array.isArray(userApplications) ? userApplications : [];
+    console.log("renderUserApplications çağrıldı, userApplications:", userApplications);
     
-    if (userAppsArray.length === 0) {
+    // userApplications değerinin kontrolü
+    if (!userApplications) {
+      console.log("userApplications undefined veya null");
       return (
-        <Alert status="info" borderRadius="md" bg={`${theme.light}`}>
-          <AlertIcon color={theme.info} />
-          <Box>
-            <AlertTitle color={theme.primary}>Bilgi</AlertTitle>
-            <AlertDescription>Henüz bir başvurunuz bulunmamaktadır.</AlertDescription>
-          </Box>
-        </Alert>
+        <Center py={10}>
+          <Text>Henüz başvuru bulunmamaktadır.</Text>
+        </Center>
       );
     }
 
+    // Array kontrolü
+    let userAppsArray = Array.isArray(userApplications) 
+      ? userApplications 
+      : (userApplications.applications && Array.isArray(userApplications.applications)) 
+        ? userApplications.applications 
+        : [];
+    
+    console.log("İşlenecek başvuru dizisi:", userAppsArray);
+    console.log("Başvuru sayısı:", userAppsArray.length);
+
+    if (userAppsArray.length === 0) {
+      return (
+        <Center py={10}>
+          <Flex direction="column" align="center">
+            <Icon as={FaClipboardList} color={`${theme.primary}60`} fontSize="5xl" mb={4} />
+            <Text>Henüz başvuru bulunmamaktadır.</Text>
+          </Flex>
+        </Center>
+      );
+    }
+
+    // Başvuruları duruma göre filtreleme
+    const pendingApplications = userAppsArray.filter(app => app.durum === "Beklemede");
+    const completedApplications = userAppsArray.filter(app => app.durum === "Onaylandı" || app.durum === "Reddedildi");
+    
+    console.log("Bekleyen başvurular:", pendingApplications.length);
+    console.log("Tamamlanmış başvurular:", completedApplications.length);
+
     return (
-      <VStack spacing={4} align="stretch">
-        {userAppsArray.map((application) => {
-          const ilan = application.ilan || {};
-          
-          return (
-            <Card key={application._id || Math.random().toString()} borderRadius="lg" boxShadow="md" bg="white" overflow="hidden">
-              <CardHeader bg={`${theme.light}`} borderBottom="1px solid" borderColor="gray.100">
-                <Flex justifyContent="space-between" alignItems="center">
-                  <Heading size="md" color={theme.primary}>{ilan.ilan_basligi || 'İlan başlığı'}</Heading>
-                  {getStatusBadge(application.durum || 'Beklemede')}
-                </Flex>
-              </CardHeader>
-              <CardBody>
-                <Stack spacing={4}>
-                  <Flex justify="space-between">
-                    <Text fontWeight="bold" color={theme.primary}>Başvuru Tarihi:</Text>
-                    <Text>{new Date(application.created_at).toLocaleDateString('tr-TR')}</Text>
-                  </Flex>
-                  <Flex justify="space-between">
-                    <Text fontWeight="bold" color={theme.primary}>Kademe:</Text>
-                    <Badge bg={theme.primary} color="white" borderRadius="md" px={2} py={1}>{ilan.kademe || 'Belirtilmemiş'}</Badge>
-                  </Flex>
-                  {application.durum === 'Kabul Edildi' && (
-                    <Alert status="success" borderRadius="md" bg={`${theme.success}10`}>
-                      <AlertIcon color={theme.success} />
-                      <Box>
-                        <AlertTitle color={theme.success}>Tebrikler!</AlertTitle>
-                        <AlertDescription>Başvurunuz kabul edilmiştir.</AlertDescription>
-                      </Box>
-                    </Alert>
-                  )}
-                  {application.puan > 0 && (
-                    <Flex justify="space-between" align="center">
-                      <Text fontWeight="bold" color={theme.primary}>Puan:</Text>
-                      <Badge bg={theme.tertiary} color="white" p={2} borderRadius="md">{application.puan} Puan</Badge>
-                    </Flex>
-                  )}
-                </Stack>
-              </CardBody>
-              <CardFooter>
-                <Button 
-                  leftIcon={<FaFileAlt />}
-                  bg={theme.primary}
-                  color="white"
-                  onClick={() => handleIlanClick(ilan)}
-                  isDisabled={!ilan._id}
-                  _hover={{ bg: theme.info }}
-                  boxShadow="sm"
+      <Box>
+        {pendingApplications.length > 0 && (
+          <Box mb={6}>
+            <Heading size="md" mb={4} display="flex" alignItems="center">
+              <Icon as={FaClock} mr={2} color={theme.warning} />
+              Bekleyen Başvurularım
+            </Heading>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+              {pendingApplications.map((application) => (
+                <Box 
+                  key={application._id}
+                  borderWidth="1px" 
+                  borderRadius="lg" 
+                  overflow="hidden" 
+                  p={4}
+                  boxShadow="md"
+                  bg="white"
+                  _hover={{ transform: "translateY(-3px)", boxShadow: "lg", transition: "all 0.2s" }}
+                  borderLeft={`4px solid ${theme.warning}`}
                 >
-                  İlan Detaylarını Görüntüle
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </VStack>
+                  <Flex alignItems="center" mb={2}>
+                    <Icon as={FaFileAlt} color={theme.primary} mr={2} />
+                    <Heading size="sm">{application.ilan?.ilan_basligi || "Başlık bulunamadı"}</Heading>
+                  </Flex>
+                  <Text fontSize="sm" color="gray.600" mb={2} display="flex" alignItems="center">
+                    <Icon as={FaCalendarAlt} mr={1} fontSize="xs" />
+                    Başvuru Tarihi: {new Date(application.created_at || application.basvuru_tarihi).toLocaleDateString('tr-TR')}
+                  </Text>
+                  <Badge colorScheme="yellow" mb={3} display="flex" alignItems="center" width="fit-content">
+                    <Icon as={FaClock} mr={1} fontSize="xs" />
+                    Beklemede
+                  </Badge>
+                  <Button 
+                    colorScheme="blue" 
+                    size="sm" 
+                    onClick={() => {
+                      setSelectedJob(application.ilan);
+                      onOpen(); // Open the modal instead of changing view
+                    }}
+                    width="full"
+                    mt={2}
+                    leftIcon={<FaEye />}
+                  >
+                    İlan Detaylarını Gör
+                  </Button>
+                </Box>
+              ))}
+            </SimpleGrid>
+          </Box>
+        )}
+
+        {completedApplications.length > 0 && (
+          <Box>
+            <Heading size="md" mb={4} display="flex" alignItems="center">
+              <Icon as={FaCheck} mr={2} color={theme.success} />
+              Sonuçlanan Başvurularım
+            </Heading>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+              {completedApplications.map((application) => (
+                <Box 
+                  key={application._id}
+                  borderWidth="1px" 
+                  borderRadius="lg" 
+                  overflow="hidden" 
+                  p={4}
+                  boxShadow="md"
+                  bg="white"
+                  _hover={{ transform: "translateY(-3px)", boxShadow: "lg", transition: "all 0.2s" }}
+                  borderLeft={`4px solid ${application.durum === "Onaylandı" ? theme.success : theme.danger}`}
+                >
+                  <Flex alignItems="center" mb={2}>
+                    <Icon as={FaFileAlt} color={theme.primary} mr={2} />
+                    <Heading size="sm">{application.ilan?.ilan_basligi || "Başlık bulunamadı"}</Heading>
+                  </Flex>
+                  <Text fontSize="sm" color="gray.600" mb={2} display="flex" alignItems="center">
+                    <Icon as={FaCalendarAlt} mr={1} fontSize="xs" />
+                    Başvuru Tarihi: {new Date(application.created_at || application.basvuru_tarihi).toLocaleDateString('tr-TR')}
+                  </Text>
+                  <Badge 
+                    colorScheme={application.durum === "Onaylandı" ? "green" : "red"} 
+                    mb={3}
+                    display="flex"
+                    alignItems="center"
+                    width="fit-content"
+                  >
+                    <Icon as={application.durum === "Onaylandı" ? FaCheck : FaTimes} mr={1} fontSize="xs" />
+                    {application.durum}
+                  </Badge>
+                  <Button 
+                    colorScheme="blue" 
+                    size="sm" 
+                    onClick={() => {
+                      setSelectedJob(application.ilan);
+                      onOpen(); // Open the modal instead of changing view
+                    }}
+                    width="full"
+                    mt={2}
+                    leftIcon={<FaEye />}
+                  >
+                    İlan Detaylarını Gör
+                  </Button>
+                </Box>
+              ))}
+            </SimpleGrid>
+          </Box>
+        )}
+
+        {pendingApplications.length === 0 && completedApplications.length === 0 && (
+          <Center py={10}>
+            <Text>Henüz başvuru bulunmamaktadır.</Text>
+          </Center>
+        )}
+      </Box>
     );
   };
 
@@ -423,12 +582,29 @@ const AdayEkrani = () => {
         <Container maxW="container.xl">
           <Flex justify="space-between" align="center">
             <Box>
-              <Heading size="lg">Akademik İlan Başvuru Sistemi</Heading>
+              <Heading size="lg" display="flex" alignItems="center">
+                <Icon as={FaUniversity} mr={3} />
+                Akademik İlan Başvuru Sistemi
+              </Heading>
               <Text mt={2}>Akademik ilerleyişiniz için tüm fırsatlar burada</Text>
             </Box>
-            <Flex align="center" bg={`${theme.primary}90`} p={2} borderRadius="md" boxShadow="sm">
-              <Avatar size="sm" name={`${userInfo?.ad || ''} ${userInfo?.soyad || ''}`} mr={3} />
-              <Text>{userInfo?.ad || ''} {userInfo?.soyad || ''}</Text>
+            <Flex align="center">
+              <Flex align="center" bg={`${theme.primary}90`} p={3} borderRadius="md" boxShadow="sm" mr={3}>
+                <Avatar size="sm" name={`${userInfo?.ad || ''} ${userInfo?.soyad || ''}`} mr={3} bg={theme.tertiary} icon={<Icon as={FaUserCircle} />} />
+                <Text>{userInfo?.ad || ''} {userInfo?.soyad || ''}</Text>
+              </Flex>
+              <Tooltip label="Çıkış Yap" placement="bottom">
+                <IconButton
+                  icon={<Icon as={FaSignOutAlt} />}
+                  aria-label="Çıkış Yap"
+                  variant="ghost"
+                  color="white"
+                  _hover={{ bg: `${theme.secondary}90` }}
+                  onClick={handleLogout}
+                  borderRadius="md"
+                  size="md"
+                />
+              </Tooltip>
             </Flex>
           </Flex>
         </Container>
@@ -437,7 +613,10 @@ const AdayEkrani = () => {
       <Container maxW="container.xl" pb={10}>
         <Card borderRadius="lg" boxShadow="md" bg="white" overflow="hidden" mb={10}>
           <CardHeader bg={theme.light} py={3} borderBottom="1px solid" borderColor="gray.100">
-            <Heading size="md" color={theme.primary}>İlan ve Başvurularınız</Heading>
+            <Flex align="center">
+              <Icon as={FaBell} color={theme.primary} mr={2} />
+              <Heading size="md" color={theme.primary}>İlan ve Başvurularınız</Heading>
+            </Flex>
           </CardHeader>
           <CardBody p={4}>
             <Tabs 
@@ -445,7 +624,16 @@ const AdayEkrani = () => {
               colorScheme="blue" 
               isLazy
               index={activeView === 'ilanlar' ? 0 : 1}
-              onChange={(index) => setActiveView(index === 0 ? 'ilanlar' : 'basvurular')}
+              onChange={(index) => {
+                // Set the active view state 
+                const newView = index === 0 ? 'ilanlar' : 'basvurular';
+                setActiveView(newView);
+                
+                // If switching to Başvurularım tab, fetch the latest applications
+                if (newView === 'basvurular') {
+                  fetchUserApplications();
+                }
+              }}
             >
               <TabList>
                 <Tab 
@@ -495,7 +683,7 @@ const AdayEkrani = () => {
       </Container>
 
       {/* İlan Detay Modalı */}
-      {selectedIlan && (
+      {selectedJob && (
         <Modal 
           isOpen={isOpen} 
           onClose={onClose} 
@@ -503,46 +691,58 @@ const AdayEkrani = () => {
           scrollBehavior="inside"
           closeOnOverlayClick={true}
         >
-          <ModalOverlay />
+          <ModalOverlay bg={`${theme.primary}40`} backdropFilter="blur(1px)" />
           <ModalContent borderRadius="lg" boxShadow="xl" overflow="hidden">
             <ModalHeader 
-              bg={hasApplied(selectedIlan._id) ? `${theme.light}` : 'white'}
+              bg={hasApplied(selectedJob._id) ? `${theme.light}` : 'white'}
               borderBottom="1px solid"
               borderColor="gray.200"
               py={4}
             >
               <Flex justify="space-between" align="center" wrap="wrap">
-                <Text fontSize="xl" fontWeight="bold" color={theme.primary}>{selectedIlan.ilan_basligi}</Text>
-                {hasApplied(selectedIlan._id) && getStatusBadge(getApplicationStatus(selectedIlan._id))}
+                <Flex align="center">
+                  <Icon as={FaFileAlt} color={theme.primary} mr={2} />
+                  <Text fontSize="xl" fontWeight="bold" color={theme.primary}>{selectedJob.ilan_basligi}</Text>
+                </Flex>
+                {hasApplied(selectedJob._id) && getStatusBadge(getApplicationStatus(selectedJob._id))}
               </Flex>
             </ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <VStack align="start" spacing={6}>
                 <Box width="100%">
-                  <Heading size="sm" mb={2} color={theme.primary}>İlan Açıklaması</Heading>
-                  <Text whiteSpace="pre-wrap">{selectedIlan.ilan_aciklamasi}</Text>
+                  <Heading size="sm" mb={2} color={theme.primary} display="flex" alignItems="center">
+                    <Icon as={FaFileAlt} mr={2} />
+                    İlan Açıklaması
+                  </Heading>
+                  <Text whiteSpace="pre-wrap">{selectedJob.ilan_aciklamasi}</Text>
                 </Box>
                 
                 <Divider />
                 
                 <Box width="100%">
-                  <Heading size="sm" mb={2} color={theme.primary}>Kademe</Heading>
-                  <Badge bg={theme.primary} color="white" fontSize="md" px={2} py={1} borderRadius="md">{selectedIlan.kademe}</Badge>
+                  <Heading size="sm" mb={2} color={theme.primary} display="flex" alignItems="center">
+                    <Icon as={FaUserGraduate} mr={2} />
+                    Kademe
+                  </Heading>
+                  <Badge bg={theme.primary} color="white" fontSize="md" px={2} py={1} borderRadius="md">{selectedJob.kademe}</Badge>
                 </Box>
                 
                 <Divider />
                 
                 <Box width="100%">
-                  <Heading size="sm" mb={2} color={theme.primary}>Başvuru Tarihleri</Heading>
+                  <Heading size="sm" mb={2} color={theme.primary} display="flex" alignItems="center">
+                    <Icon as={FaCalendarAlt} mr={2} />
+                    Başvuru Tarihleri
+                  </Heading>
                   <Flex justify="space-between" width="100%" flexWrap="wrap">
                     <Box>
                       <Text fontWeight="bold" fontSize="sm" color={theme.primary}>Başlangıç:</Text>
-                      <Text>{new Date(selectedIlan.basvuru_baslangic_tarihi).toLocaleDateString('tr-TR')}</Text>
+                      <Text>{new Date(selectedJob.basvuru_baslangic_tarihi).toLocaleDateString('tr-TR')}</Text>
                     </Box>
                     <Box>
                       <Text fontWeight="bold" fontSize="sm" color={theme.primary}>Bitiş:</Text>
-                      <Text>{new Date(selectedIlan.basvuru_bitis_tarihi).toLocaleDateString('tr-TR')}</Text>
+                      <Text>{new Date(selectedJob.basvuru_bitis_tarihi).toLocaleDateString('tr-TR')}</Text>
                     </Box>
                   </Flex>
                 </Box>
@@ -550,9 +750,12 @@ const AdayEkrani = () => {
                 <Divider />
                 
                 <Box width="100%">
-                  <Heading size="sm" mb={2} color={theme.primary}>Gerekli Belgeler</Heading>
+                  <Heading size="sm" mb={2} color={theme.primary} display="flex" alignItems="center">
+                    <Icon as={FaClipboardList} mr={2} />
+                    Gerekli Belgeler
+                  </Heading>
                   <List spacing={2}>
-                    {selectedIlan.required_documents && selectedIlan.required_documents.map((doc, idx) => (
+                    {selectedJob.required_documents && selectedJob.required_documents.map((doc, idx) => (
                       <ListItem key={idx}>
                         <ListIcon as={FaFileAlt} color={theme.primary} />
                         {doc}
@@ -561,14 +764,17 @@ const AdayEkrani = () => {
                   </List>
                 </Box>
                 
-                {selectedIlan.criteria && (
+                {selectedJob.criteria && (
                   <>
                     <Divider />
                     
                     <Box width="100%">
-                      <Heading size="sm" mb={2} color={theme.primary}>Değerlendirme Kriterleri</Heading>
+                      <Heading size="sm" mb={2} color={theme.primary} display="flex" alignItems="center">
+                        <Icon as={FaClipboardList} mr={2} />
+                        Değerlendirme Kriterleri
+                      </Heading>
                       <VStack align="start" spacing={3} width="100%">
-                        {selectedIlan.criteria.criteria && selectedIlan.criteria.criteria.map((criterion, idx) => (
+                        {selectedJob.criteria.criteria && selectedJob.criteria.criteria.map((criterion, idx) => (
                           <Box key={idx} width="100%">
                             <Flex justify="space-between" mb={1}>
                               <Text>{criterion.name}</Text>
@@ -576,7 +782,7 @@ const AdayEkrani = () => {
                             </Flex>
                             <Progress 
                               value={criterion.points} 
-                              max={selectedIlan.criteria.total_minimum_points} 
+                              max={selectedJob.criteria.total_minimum_points} 
                               sx={{
                                 '& > div': {
                                   background: theme.primary
@@ -596,13 +802,13 @@ const AdayEkrani = () => {
             </ModalBody>
             
             <ModalFooter bg={theme.light} borderTop="1px solid" borderColor="gray.200">
-              {hasApplied(selectedIlan._id) ? (
+              {hasApplied(selectedJob._id) ? (
                 <Alert status="info" borderRadius="md" width="100%" bg={`${theme.info}10`}>
                   <AlertIcon color={theme.info} />
                   <Box>
                     <AlertTitle color={theme.info}>Bilgi</AlertTitle>
                     <AlertDescription>
-                      Bu ilana zaten başvurdunuz. Başvuru durumunuz: {getStatusBadge(getApplicationStatus(selectedIlan._id))}
+                      Bu ilana zaten başvurdunuz. Başvuru durumunuz: {getStatusBadge(getApplicationStatus(selectedJob._id))}
                     </AlertDescription>
                   </Box>
                 </Alert>

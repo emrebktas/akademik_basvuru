@@ -84,7 +84,7 @@ academicPostSchema.methods.isPostActive = function() {
 
 // Update applications count when applications are added or removed
 academicPostSchema.methods.updateApplicationsCount = async function() {
-    const count = await mongoose.model('Application').countDocuments({ academic_post: this._id });
+    const count = await mongoose.model('application').countDocuments({ ilan_id: this._id });
     this.applications_count = count;
     await this.save();
 };

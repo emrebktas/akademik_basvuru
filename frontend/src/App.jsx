@@ -7,6 +7,7 @@ import YoneticiEkrani from './yonetici-ekrani.jsx'; // Updated to match the comp
 import AdminEkrani from './admin-ekrani.jsx';
 import JuriEkrani from './juri-ekrani.jsx';
 import DrOgrUyesiBasvuruForm from './components/DrOgrUyesiBasvuruForm.jsx';
+import MainPage from './main-page.jsx';
 
 // Diğer ekranlar için placeholder bileşenler
 const Dashboard = () => <div>Dashboard</div>;
@@ -46,7 +47,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<MainPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
@@ -57,7 +58,7 @@ function App() {
         />
         <Route 
           path="/juri-ekrani" 
-          element={<ProtectedRoute element={<JuriEkrani />} allowedRoles={['Juri']} />} 
+          element={<ProtectedRoute element={<JuriEkrani />} allowedRoles={['Juri','Admin']} />} 
         />
         <Route 
           path="/yonetici-ekrani" 

@@ -83,8 +83,7 @@ applicationCriteriaSchema.statics.createDefaultCriteria = async function() {
         minA1A5Points: 5
       },
       pointCriteria: {
-        minPoints: 100,
-        maxPoints: 250
+        minPoints: 100
       },
       acceptedLanguageExams: ['YDS', 'YÖKDİL', 'TOEFL iBT', 'IELTS'],
       minLanguageScore: 65
@@ -103,7 +102,6 @@ applicationCriteriaSchema.statics.createDefaultCriteria = async function() {
       },
       pointCriteria: {
         minPoints: 90,
-        maxPoints: 250
       },
       acceptedLanguageExams: ['YDS', 'YÖKDİL', 'TOEFL iBT', 'IELTS'],
       minLanguageScore: 65
@@ -122,7 +120,6 @@ applicationCriteriaSchema.statics.createDefaultCriteria = async function() {
       },
       pointCriteria: {
         minPoints: 80,
-        maxPoints: 250
       },
       acceptedLanguageExams: ['YDS', 'YÖKDİL', 'TOEFL iBT', 'IELTS'],
       minLanguageScore: 65
@@ -140,8 +137,7 @@ applicationCriteriaSchema.statics.createDefaultCriteria = async function() {
         minA1A5Points: 5
       },
       pointCriteria: {
-        minPoints: 80,
-        maxPoints: 250
+        minPoints: 80 
       },
       acceptedLanguageExams: ['YDS', 'YÖKDİL', 'TOEFL iBT', 'IELTS'],
       minLanguageScore: 65

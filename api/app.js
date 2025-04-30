@@ -5,6 +5,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 const cors = require('cors');
+const admin = require("firebase-admin");
 
 const bodyParser = require('body-parser');
 const userRoutes = require('./routes/users');
@@ -33,6 +34,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', require('./routes/index'));
 app.use('/api/users', userRoutes);
+// Mount publication routes (ensure this is done *after* Firebase init)
+const publicationRoutes = require('./routes/publications');
+app.use('/api/publications', publicationRoutes); 
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -50,4 +54,29 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
+// --- Firebase Admin Initialization ---
+const serviceAccountPath = "./akademik-basvuru-firebase-adminsdk-fbsvc-0379fe325b.json";
+
+try {
+  const serviceAccount = require(serviceAccountPath);
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: "akademik-basvuru.firebasestorage.app" 
+  });
+
+  console.log("Firebase Admin SDK initialized successfully with correct bucket.");
+
+} catch (error) {
+  if (error.code === 'MODULE_NOT_FOUND') {
+    console.error(`ERROR: Could not find the service account file at ${serviceAccountPath}`);
+  } else {
+    console.error("ERROR initializing Firebase Admin SDK:", error);
+  }
+  // Consider exiting if Firebase init fails
+  // process.exit(1); 
+}
+// --- End Firebase Admin Initialization ---
+
+// Export only the app
 module.exports = app;

@@ -57,6 +57,10 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  FormHelperText,
+  Icon,
+  Center,
+  Spinner
 } from '@chakra-ui/react';
 import { 
   AddIcon, 
@@ -68,7 +72,48 @@ import {
   InfoIcon,
   CalendarIcon
 } from '@chakra-ui/icons';
+import { 
+  FaFileAlt, 
+  FaCheck, 
+  FaTimes, 
+  FaClock, 
+  FaEye, 
+  FaPaperPlane, 
+  FaArrowRight, 
+  FaGraduationCap, 
+  FaUniversity, 
+  FaUserGraduate, 
+  FaCalendarAlt, 
+  FaClipboardList, 
+  FaSearch, 
+  FaUpload, 
+  FaHandshake, 
+  FaClipboardCheck, 
+  FaAngleRight,
+  FaUsers,
+  FaChartBar,
+  FaCog,
+  FaUserPlus,
+  FaTrash,
+  FaEdit,
+  FaPlus,
+  FaFilePdf,
+  FaSignOutAlt
+} from 'react-icons/fa';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+// Kocaeli Üniversitesi tema renkleri
+const theme = {
+  primary: "#17468f",    // Koyu Mavi (Ana renk)
+  secondary: "#e74c3c",  // Kırmızı (Vurgu rengi)
+  tertiary: "#1abc9c",   // Turkuaz (Yardımcı renk)
+  light: "#ecf0f1",      // Açık gri  
+  success: "#2ecc71",    // Yeşil
+  warning: "#f39c12",    // Turuncu
+  danger: "#c0392b",     // Koyu kırmızı
+  info: "#3498db"        // Açık mavi
+};
 
 // İlan oluşturma/düzenleme formu bileşeni
 const IlanForm = ({ initialData, onSubmit, isEdit = false }) => {
@@ -81,6 +126,7 @@ const IlanForm = ({ initialData, onSubmit, isEdit = false }) => {
     required_documents: [],
     department: '',
     criteria: '',
+    fieldGroup: '',
     durum: 'Açık'
   });
   
@@ -89,6 +135,14 @@ const IlanForm = ({ initialData, onSubmit, isEdit = false }) => {
     basvuru_baslangic_tarihi: '',
     basvuru_bitis_tarihi: ''
   });
+
+  // Alan Grubu seçenekleri
+  const fieldGroupOptions = [
+    { value: 'saglik-fen', label: 'Sağlık/Fen/Mat-Müh-Ziraat/Orman/Su Ürünleri' },
+    { value: 'egitim-sosyal', label: 'Eğitim/Foloji/Mimarlık-Planlama-Tasarım/SBİB/Spor' },
+    { value: 'hukuk-ilahiyat', label: 'Hukuk/İlahiyat' },
+    { value: 'guzel-sanatlar', label: 'Güzel Sanatlar' }
+  ];
 
   // Belge seçenekleri
   const documentOptions = [
@@ -129,10 +183,19 @@ const IlanForm = ({ initialData, onSubmit, isEdit = false }) => {
       });
     }
     
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    // Alan grubu seçildiğinde otomatik olarak criteria değerini de ayarla
+    if (name === 'fieldGroup') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        criteria: value // Alan grubu değerini criteria alanına da otomatik ekle
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   const handleDocumentChange = (document, isChecked) => {
@@ -206,13 +269,22 @@ const IlanForm = ({ initialData, onSubmit, isEdit = false }) => {
         </FormControl>
 
         <FormControl isRequired>
-          <FormLabel>Kriter ID</FormLabel>
-          <Input
-            name="criteria"
-            value={formData.criteria}
+          <FormLabel>Alan Grubu</FormLabel>
+          <Select
+            name="fieldGroup"
+            value={formData.fieldGroup}
             onChange={handleChange}
-            placeholder="Kriter ID'sini girin"
-          />
+            placeholder="Alan grubu seçin"
+          >
+            {fieldGroupOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+          <FormHelperText>
+            Alan grubu seçildiğinde kriter bilgisi otomatik olarak atanacaktır.
+          </FormHelperText>
         </FormControl>
 
         <FormControl isRequired>
@@ -317,11 +389,16 @@ const AdminEkrani = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [bekleyenBasvuruSayisi, setBekleyenBasvuruSayisi] = useState(0);
   const [aktifIlanSayisi, setAktifIlanSayisi] = useState(0);
+  const [tamamlanmisBasvurular, setTamamlanmisBasvurular] = useState([]);
+  const [kullanicilar, setKullanicilar] = useState([]);
+  const [basvuruLoading, setBasvuruLoading] = useState(false);
+  const [kullaniciLoading, setKullaniciLoading] = useState(false);
   
   const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
   const cancelRef = React.useRef();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const fetchIlanlar = useCallback(async () => {
     setLoading(true);
@@ -342,7 +419,7 @@ const AdminEkrani = () => {
       const aktifIlanlar = response.data.filter(ilan => ilan.durum === 'Açık');
       setAktifIlanSayisi(aktifIlanlar.length);
       
-      setBekleyenBasvuruSayisi(5);
+      setBekleyenBasvuruSayisi(response.data.filter(ilan => ilan.durum === 'Beklemede').length);
     } catch (error) {
       console.error('İlanlar yüklenirken hata oluştu:', error);
       toast({ 
@@ -357,9 +434,118 @@ const AdminEkrani = () => {
     }
   }, [toast]);
 
+  const fetchTamamlanmisBasvurular = useCallback(async () => {
+    setBasvuruLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      // Önce tüm ilanları getir
+      const postsResponse = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/applications/get-posts`,
+        config
+      );
+      
+      // Her ilan için başvuruları topla
+      let allApplications = [];
+      
+      if (postsResponse.data && postsResponse.data.length > 0) {
+        // Her ilana ait başvuruları paralel olarak getir
+        const applicationsPromises = postsResponse.data.map(post => 
+          axios.get(
+            `${import.meta.env.VITE_API_URL}/api/applications/post/${post._id}`,
+            config
+          )
+          .then(response => {
+            // İlan bilgilerini başvurulara ekle
+            return response.data.map(application => ({
+              ...application,
+              ilan_detay: {
+                ilan_basligi: post.ilan_basligi,
+                kademe: post.kademe,
+                department: post.department
+              }
+            }));
+          })
+          .catch(error => {
+            console.error(`Başvurular alınırken hata: ${post._id}`, error);
+            return [];
+          })
+        );
+        
+        // Tüm başvuruları topla
+        const applicationsResponses = await Promise.all(applicationsPromises);
+        allApplications = applicationsResponses.flat();
+      }
+      
+      // Tamamlanmış (onaylanmış veya reddedilmiş) başvuruları filtrele
+      const tamamlanmis = allApplications.filter(basvuru => 
+        basvuru.durum_gecmisi && 
+        basvuru.durum_gecmisi.length > 0 && 
+        ['Onaylandı', 'Reddedildi'].includes(basvuru.durum_gecmisi[0].durum)
+      );
+      
+      setTamamlanmisBasvurular(tamamlanmis);
+    } catch (error) {
+      console.error('Başvurular yüklenirken hata oluştu:', error);
+      toast({
+        title: 'Hata',
+        description: error.response?.data?.error || 'Başvurular yüklenirken bir hata oluştu.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setBasvuruLoading(false);
+    }
+  }, [toast]);
+
+  const fetchKullanicilar = useCallback(async () => {
+    setKullaniciLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/yonetici/users`,
+        config
+      );
+      
+      setKullanicilar(response.data);
+    } catch (error) {
+      console.error('Kullanıcılar yüklenirken hata oluştu:', error);
+      toast({
+        title: 'Hata',
+        description: error.response?.data?.error || 'Kullanıcılar yüklenirken bir hata oluştu.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setKullaniciLoading(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     fetchIlanlar();
   }, [fetchIlanlar]);
+
+  // Sekme değişikliğini takip etmek için
+  const handleTabChange = (index) => {
+    if (index === 1 && tamamlanmisBasvurular.length === 0) {
+      fetchTamamlanmisBasvurular();
+    } else if (index === 2 && kullanicilar.length === 0) {
+      fetchKullanicilar();
+    }
+  };
 
   const handleCreateIlan = () => {
     setSelectedIlan(null);
@@ -372,7 +558,9 @@ const AdminEkrani = () => {
       ...ilan,
       basvuru_baslangic_tarihi: ilan.basvuru_baslangic_tarihi,
       basvuru_bitis_tarihi: ilan.basvuru_bitis_tarihi,
-      durum: ilan.durum
+      durum: ilan.durum,
+      fieldGroup: ilan.fieldGroup || '',
+      criteria: ilan.criteria || ilan.fieldGroup || ''
     });
     setIsEditing(true);
     onFormOpen();
@@ -492,82 +680,302 @@ const AdminEkrani = () => {
         return 'red';
       case 'Tamamlandı':
         return 'blue';
+      case 'Onaylandı':
+        return 'green';
+      case 'Reddedildi':
+        return 'red';
+      case 'Beklemede':
+        return 'yellow';
+      case 'Juri Değerlendirmesinde':
+        return 'purple';
       default:
         return 'gray';
     }
   };
 
-  return (
-    <Container maxW="8xl" py={8}>
-      <Stack spacing={8}>
-        <Box>
-          <Heading mb={4}>Admin Paneli</Heading>
-          <Text color="gray.600">Akademik İlan Yönetim Sistemi</Text>
-        </Box>
+  // Başvuru detaylarını görüntüleme fonksiyonu
+  const [selectedBasvuru, setSelectedBasvuru] = useState(null);
+  const { isOpen: isBasvuruDetailOpen, onOpen: onBasvuruDetailOpen, onClose: onBasvuruDetailClose } = useDisclosure();
 
-        {/* İstatistik Kartları */}
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
-          <Card>
-            <CardBody>
+  const handleViewBasvuruDetails = (basvuru) => {
+    setSelectedBasvuru(basvuru);
+    onBasvuruDetailOpen();
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userInfo');
+    localStorage.removeItem('token');
+    navigate('/');
+    toast({
+      title: 'Çıkış Yapıldı',
+      description: 'Başarıyla çıkış yaptınız.',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
+  return (
+    <Box minH="100vh" bg={theme.light}>
+      {/* Hero Section */}
+      <Box bg={theme.primary} color="white" py={10} mb={10} boxShadow="lg" position="relative" overflow="hidden">
+        {/* Decorative Elements */}
+        <Box 
+          position="absolute" 
+          top="-50px" 
+          right="-50px" 
+          bg={`${theme.secondary}30`}
+          borderRadius="full" 
+          w="200px" 
+          h="200px"
+          zIndex="0"
+        />
+        <Box 
+          position="absolute" 
+          bottom="-30px" 
+          left="-30px" 
+          bg={`${theme.tertiary}30`}
+          borderRadius="full" 
+          w="150px" 
+          h="150px"
+          zIndex="0"
+        />
+
+        <Container maxW="container.xl" position="relative" zIndex="1">
+          <Flex justify="space-between" align="center">
+            <Box textAlign={{ base: "center", md: "center" }} flexGrow={1}>
+              <Heading size="2xl" mb={4}>Admin Paneli</Heading>
+              <Divider my={4} borderColor={`${theme.secondary}`} width="60%" mx="auto" opacity="0.5" />
+              <Text fontSize="xl" mb={6}>Akademik İlan Yönetim Sistemi</Text>
+            </Box>
+            <Tooltip label="Çıkış Yap" placement="bottom">
+              <IconButton
+                icon={<Icon as={FaSignOutAlt} />}
+                aria-label="Çıkış Yap"
+                variant="ghost"
+                color="white"
+                _hover={{ bg: `${theme.secondary}90` }}
+                onClick={handleLogout}
+                borderRadius="md"
+                size="md"
+              />
+            </Tooltip>
+          </Flex>
+        </Container>
+      </Box>
+
+      {/* Main Content */}
+      <Container maxW="container.xl" pb={20}>
+        {/* Statistics Cards */}
+        <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6} mb={8}>
+          <Card bg="white" boxShadow="md" borderRadius="lg" overflow="hidden" position="relative">
+            <Box 
+              position="absolute" 
+              top="-20px" 
+              right="-20px" 
+              bg={`${theme.primary}10`}
+              borderRadius="full" 
+              w="80px" 
+              h="80px"
+              zIndex="0"
+            />
+            <CardBody position="relative" zIndex="1">
               <Stat>
-                <StatLabel>Aktif İlanlar</StatLabel>
-                <StatNumber>{aktifIlanSayisi}</StatNumber>
-                <StatHelpText>
-                  <HStack>
-                    <CalendarIcon />
-                    <Text>Başvuruya açık</Text>
-                  </HStack>
-                </StatHelpText>
+                <Flex align="center" mb={4}>
+                  <Flex 
+                    bg={`${theme.primary}20`} 
+                    p={2} 
+                    borderRadius="full" 
+                    color={theme.primary}
+                    mr={3}
+                    boxSize="40px"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Icon as={FaFileAlt} boxSize="20px" />
+                  </Flex>
+                  <StatLabel fontSize="lg">Toplam İlan</StatLabel>
+                </Flex>
+                <StatNumber color={theme.primary}>{ilanlar.length}</StatNumber>
+                <StatHelpText>Aktif ve pasif tüm ilanlar</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
-          
-          <Card>
-            <CardBody>
+
+          <Card bg="white" boxShadow="md" borderRadius="lg" overflow="hidden" position="relative">
+            <Box 
+              position="absolute" 
+              top="-20px" 
+              right="-20px" 
+              bg={`${theme.info}10`}
+              borderRadius="full" 
+              w="80px" 
+              h="80px"
+              zIndex="0"
+            />
+            <CardBody position="relative" zIndex="1">
               <Stat>
-                <StatLabel>Bekleyen Başvurular</StatLabel>
-                <StatNumber>{bekleyenBasvuruSayisi}</StatNumber>
-                <StatHelpText>Değerlendirme bekliyor</StatHelpText>
+                <Flex align="center" mb={4}>
+                  <Flex 
+                    bg={`${theme.info}20`} 
+                    p={2} 
+                    borderRadius="full" 
+                    color={theme.info}
+                    mr={3}
+                    boxSize="40px"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Icon as={FaUsers} boxSize="20px" />
+                  </Flex>
+                  <StatLabel fontSize="lg">Toplam Başvuru</StatLabel>
+                </Flex>
+                <StatNumber color={theme.info}>{bekleyenBasvuruSayisi + tamamlanmisBasvurular.length}</StatNumber>
+                <StatHelpText>Tüm başvurular</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
-          
-          <Card>
-            <CardBody>
+
+          <Card bg="white" boxShadow="md" borderRadius="lg" overflow="hidden" position="relative">
+            <Box 
+              position="absolute" 
+              top="-20px" 
+              right="-20px" 
+              bg={`${theme.warning}10`}
+              borderRadius="full" 
+              w="80px" 
+              h="80px"
+              zIndex="0"
+            />
+            <CardBody position="relative" zIndex="1">
               <Stat>
-                <StatLabel>Toplam İlan</StatLabel>
-                <StatNumber>{ilanlar.length}</StatNumber>
-                <StatHelpText>Tüm dönemler</StatHelpText>
+                <Flex align="center" mb={4}>
+                  <Flex 
+                    bg={`${theme.warning}20`} 
+                    p={2} 
+                    borderRadius="full" 
+                    color={theme.warning}
+                    mr={3}
+                    boxSize="40px"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Icon as={FaClock} boxSize="20px" />
+                  </Flex>
+                  <StatLabel fontSize="lg">Bekleyen Başvuru</StatLabel>
+                </Flex>
+                <StatNumber color={theme.warning}>{bekleyenBasvuruSayisi}</StatNumber>
+                <StatHelpText>Değerlendirme bekleyen</StatHelpText>
+              </Stat>
+            </CardBody>
+          </Card>
+
+          <Card bg="white" boxShadow="md" borderRadius="lg" overflow="hidden" position="relative">
+            <Box 
+              position="absolute" 
+              top="-20px" 
+              right="-20px" 
+              bg={`${theme.tertiary}10`}
+              borderRadius="full" 
+              w="80px" 
+              h="80px"
+              zIndex="0"
+            />
+            <CardBody position="relative" zIndex="1">
+              <Stat>
+                <Flex align="center" mb={4}>
+                  <Flex 
+                    bg={`${theme.tertiary}20`} 
+                    p={2} 
+                    borderRadius="full" 
+                    color={theme.tertiary}
+                    mr={3}
+                    boxSize="40px"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Icon as={FaClipboardCheck} boxSize="20px" />
+                  </Flex>
+                  <StatLabel fontSize="lg">Aktif İlan</StatLabel>
+                </Flex>
+                <StatNumber color={theme.tertiary}>{aktifIlanSayisi}</StatNumber>
+                <StatHelpText>Başvuruya açık</StatHelpText>
               </Stat>
             </CardBody>
           </Card>
         </SimpleGrid>
 
-        {/* Sekme Menüsü */}
-        <Tabs colorScheme="blue" variant="enclosed">
-          <TabList>
-            <Tab>İlanlar</Tab>
-            <Tab>Başvurular</Tab>
-            <Tab>Kullanıcılar</Tab>
-          </TabList>
+        {/* Main Card with Tabs */}
+        <Card borderRadius="lg" boxShadow="md" bg="white" overflow="hidden" position="relative">
+          <Box 
+            position="absolute" 
+            top="-30px" 
+            right="-30px" 
+            bg={`${theme.tertiary}10`}
+            borderRadius="full" 
+            w="120px" 
+            h="120px"
+            zIndex="0"
+          />
+          <CardHeader bg={theme.light} py={4} borderBottom="1px solid" borderColor="gray.100" position="relative" zIndex="1">
+            <Flex align="center">
+              <Flex 
+                bg={`${theme.primary}20`} 
+                p={2} 
+                borderRadius="full" 
+                color={theme.primary}
+                mr={3}
+                boxSize="40px"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={FaClipboardList} boxSize="20px" />
+              </Flex>
+              <Heading size="lg" color={theme.primary}>İlan Yönetimi</Heading>
+            </Flex>
+          </CardHeader>
+          <CardBody p={6}>
+            <Tabs colorScheme="blue" onChange={handleTabChange}>
+              <TabList mb={4}>
+                <Tab>
+                  <HStack spacing={2}>
+                    <Icon as={FaFileAlt} />
+                    <Text>İlanlar</Text>
+                  </HStack>
+                </Tab>
+                <Tab>
+                  <HStack spacing={2}>
+                    <Icon as={FaUsers} />
+                    <Text>Başvurular</Text>
+                  </HStack>
+                </Tab>
+                <Tab>
+                  <HStack spacing={2}>
+                    <Icon as={FaUserGraduate} />
+                    <Text>Kullanıcılar</Text>
+                  </HStack>
+                </Tab>
+              </TabList>
 
-          <TabPanels>
-            {/* İlanlar Sekmesi */}
-            <TabPanel p={0} pt={4}>
-              <Card>
-                <CardHeader>
-                  <Flex justifyContent="space-between" alignItems="center">
-                    <Heading size="md">İlan Listesi</Heading>
-                    <Button leftIcon={<AddIcon />} colorScheme="blue" onClick={handleCreateIlan}>
+              <TabPanels>
+                {/* İlanlar Tab Panel */}
+                <TabPanel p={0}>
+                  <Flex justifyContent="space-between" alignItems="center" mb={4}>
+                    <Button 
+                      leftIcon={<Icon as={FaPlus} />} 
+                      bg={theme.primary}
+                      color="white"
+                      _hover={{ bg: theme.info }}
+                      onClick={handleCreateIlan}
+                    >
                       Yeni İlan
                     </Button>
                   </Flex>
-                </CardHeader>
-                <CardBody>
+
                   {loading ? (
-                    <Text>Yükleniyor...</Text>
-                  ) : ilanlar.length === 0 ? (
-                    <Text>Henüz ilan bulunmamaktadır.</Text>
+                    <Center p={8}>
+                      <Spinner size="xl" color={theme.primary} />
+                    </Center>
                   ) : (
                     <Table variant="simple">
                       <Thead>
@@ -586,63 +994,186 @@ const AdminEkrani = () => {
                             <Td>{ilan.ilan_basligi}</Td>
                             <Td>{ilan.kademe}</Td>
                             <Td>
-                              <Badge colorScheme={getDurumColor(ilan.durum)}>
+                              <Badge 
+                                bg={getDurumColor(ilan.durum)} 
+                                color="white"
+                                borderRadius="md"
+                                px={2}
+                                py={1}
+                              >
                                 {ilan.durum}
                               </Badge>
                             </Td>
                             <Td>{formatDate(ilan.basvuru_baslangic_tarihi)}</Td>
                             <Td>{formatDate(ilan.basvuru_bitis_tarihi)}</Td>
                             <Td>
-                              <Menu>
-                                <MenuButton
-                                  as={IconButton}
-                                  icon={<ChevronDownIcon />}
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  İşlemler
-                                </MenuButton>
-                                <MenuList>
-                                  <MenuItem icon={<EditIcon />} onClick={() => handleEditIlan(ilan)}>
-                                    Düzenle
-                                  </MenuItem>
-                                  <MenuItem icon={<DeleteIcon />} onClick={() => handleDeleteClick(ilan)}>
-                                    Sil
-                                  </MenuItem>
-                                  <MenuItem icon={<InfoIcon />}>
-                                    Detaylar
-                                  </MenuItem>
-                                </MenuList>
-                              </Menu>
+                              <HStack spacing={2}>
+                                <IconButton
+                                  icon={<Icon as={FaEdit} />}
+                                  aria-label="Düzenle"
+                                  bg={theme.info}
+                                  color="white"
+                                  _hover={{ bg: theme.primary }}
+                                  onClick={() => handleEditIlan(ilan)}
+                                />
+                                <IconButton
+                                  icon={<Icon as={FaTrash} />}
+                                  aria-label="Sil"
+                                  bg={theme.danger}
+                                  color="white"
+                                  _hover={{ bg: theme.secondary }}
+                                  onClick={() => handleDeleteClick(ilan)}
+                                />
+                              </HStack>
                             </Td>
                           </Tr>
                         ))}
                       </Tbody>
                     </Table>
                   )}
-                </CardBody>
-              </Card>
-            </TabPanel>
+                </TabPanel>
 
-            {/* Başvurular Sekmesi */}
-            <TabPanel>
-              <Text>Başvuru yönetimi bu sekmede gösterilecek.</Text>
-            </TabPanel>
+                {/* Başvurular Tab Panel */}
+                <TabPanel p={0}>
+                  <Card>
+                    <CardHeader>
+                      <Flex justifyContent="space-between" alignItems="center">
+                        <Heading size="md">Tamamlanmış Başvurular</Heading>
+                        <Button 
+                          colorScheme="blue" 
+                          size="sm" 
+                          leftIcon={<InfoIcon />}
+                          onClick={fetchTamamlanmisBasvurular}
+                          isLoading={basvuruLoading}
+                        >
+                          Güncelle
+                        </Button>
+                      </Flex>
+                    </CardHeader>
+                    <CardBody>
+                      {basvuruLoading ? (
+                        <Text>Yükleniyor...</Text>
+                      ) : tamamlanmisBasvurular.length === 0 ? (
+                        <Text>Henüz tamamlanmış başvuru bulunmamaktadır.</Text>
+                      ) : (
+                        <Table variant="simple">
+                          <Thead>
+                            <Tr>
+                              <Th>İlan Başlığı</Th>
+                              <Th>Bölüm</Th>
+                              <Th>Kademe</Th>
+                              <Th>Aday</Th>
+                              <Th>Başvuru Tarihi</Th>
+                              <Th>Durum</Th>
+                              <Th>İşlemler</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {tamamlanmisBasvurular.map((basvuru) => (
+                              <Tr key={basvuru._id}>
+                                <Td>{basvuru.ilan_detay?.ilan_basligi || basvuru.ilan_id?.ilan_basligi || 'Belirtilmemiş'}</Td>
+                                <Td>{basvuru.ilan_detay?.department || basvuru.ilan_id?.department || 'Belirtilmemiş'}</Td>
+                                <Td>{basvuru.ilan_detay?.kademe || basvuru.ilan_id?.kademe || 'Belirtilmemiş'}</Td>
+                                <Td>{basvuru.aday_id ? `${basvuru.aday_id.ad} ${basvuru.aday_id.soyad}` : 'Belirtilmemiş'}</Td>
+                                <Td>{formatDate(basvuru.created_at)}</Td>
+                                <Td>
+                                  <Badge colorScheme={getDurumColor(basvuru.durum_gecmisi[0].durum)}>
+                                    {basvuru.durum_gecmisi[0].durum}
+                                  </Badge>
+                                </Td>
+                                <Td>
+                                  <HStack spacing={2}>
+                                    <Tooltip label="Detayları Görüntüle">
+                                      <IconButton
+                                        icon={<InfoIcon />}
+                                        aria-label="Detaylar"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleViewBasvuruDetails(basvuru)}
+                                      />
+                                    </Tooltip>
+                                  </HStack>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      )}
+                    </CardBody>
+                  </Card>
+                </TabPanel>
 
-            {/* Kullanıcılar Sekmesi */}
-            <TabPanel>
-              <Text>Kullanıcı yönetimi bu sekmede gösterilecek.</Text>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </Stack>
+                {/* Kullanıcılar Tab Panel */}
+                <TabPanel p={0}>
+                  <Card>
+                    <CardHeader>
+                      <Heading size="md">Sistem Kullanıcıları</Heading>
+                    </CardHeader>
+                    <CardBody>
+                      {kullaniciLoading ? (
+                        <Text>Yükleniyor...</Text>
+                      ) : kullanicilar.length === 0 ? (
+                        <Text>Henüz kullanıcı bulunmamaktadır.</Text>
+                      ) : (
+                        <Table variant="simple">
+                          <Thead>
+                            <Tr>
+                              <Th>Ad Soyad</Th>
+                              <Th>Rol</Th>
+                              <Th>E-posta</Th>
+                              <Th>Bölüm</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {kullanicilar.map((kullanici) => (
+                              <Tr key={kullanici._id}>
+                                <Td>{kullanici.name || `${kullanici.ad || ''} ${kullanici.soyad || ''}`}</Td>
+                                <Td>
+                                  <Badge colorScheme={
+                                    kullanici.role === 'Admin' || kullanici.rol === 'Admin' ? 'red' :
+                                    kullanici.role === 'Yonetici' || kullanici.rol === 'Yonetici' ? 'purple' :
+                                    kullanici.role === 'Juri' || kullanici.rol === 'Juri' ? 'blue' : 
+                                    'green'
+                                  }>
+                                    {kullanici.role || kullanici.rol}
+                                  </Badge>
+                                </Td>
+                                <Td>{kullanici.email || 'Belirtilmemiş'}</Td>
+                                <Td>{kullanici.department || 'Belirtilmemiş'}</Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      )}
+                    </CardBody>
+                  </Card>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </CardBody>
+        </Card>
+      </Container>
 
-      {/* İlan Düzenleme/Oluşturma Modalı */}
+      {/* Modals with updated styling */}
       <Modal isOpen={isFormOpen} onClose={onFormClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
-            {isEditing ? 'İlan Düzenle' : 'Yeni İlan Oluştur'}
+        <ModalOverlay bg={`${theme.primary}40`} backdropFilter="blur(2px)" />
+        <ModalContent borderRadius="lg">
+          <ModalHeader bg={theme.light} borderBottom="1px solid" borderColor="gray.200">
+            <Flex align="center">
+              <Flex 
+                bg={`${theme.primary}20`} 
+                p={2} 
+                borderRadius="full" 
+                color={theme.primary}
+                mr={3}
+                boxSize="40px"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={isEditing ? FaEdit : FaPlus} boxSize="20px" />
+              </Flex>
+              <Text>{isEditing ? 'İlan Düzenle' : 'Yeni İlan Oluştur'}</Text>
+            </Flex>
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
@@ -682,7 +1213,78 @@ const AdminEkrani = () => {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
-    </Container>
+
+      {/* Başvuru Detayları Modalı */}
+      <Modal isOpen={isBasvuruDetailOpen} onClose={onBasvuruDetailClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Başvuru Detayları</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            {selectedBasvuru && (
+              <VStack spacing={4} align="stretch">
+                <Flex justifyContent="space-between">
+                  <Box>
+                    <Text fontWeight="bold">İlan Bilgileri</Text>
+                    <Text>{selectedBasvuru.ilan_detay?.ilan_basligi || selectedBasvuru.ilan_id?.ilan_basligi || 'Belirtilmemiş'}</Text>
+                    <Text fontSize="sm" color="gray.600">
+                      {selectedBasvuru.ilan_detay?.department || selectedBasvuru.ilan_id?.department || 'Belirtilmemiş'} - 
+                      {selectedBasvuru.ilan_detay?.kademe || selectedBasvuru.ilan_id?.kademe || 'Belirtilmemiş'}
+                    </Text>
+                  </Box>
+                  <Badge colorScheme={getDurumColor(selectedBasvuru.durum_gecmisi[0].durum)}>
+                    {selectedBasvuru.durum_gecmisi[0].durum}
+                  </Badge>
+                </Flex>
+                
+                <Divider />
+                
+                <Box>
+                  <Text fontWeight="bold">Aday Bilgileri</Text>
+                  <Text>{selectedBasvuru.aday_id ? `${selectedBasvuru.aday_id.ad} ${selectedBasvuru.aday_id.soyad}` : 'Belirtilmemiş'}</Text>
+                  {selectedBasvuru.aday_id?.tc_kimlik_no && (
+                    <Text fontSize="sm" color="gray.600">TC: {selectedBasvuru.aday_id.tc_kimlik_no}</Text>
+                  )}
+                </Box>
+                
+                <Divider />
+                
+                <Box>
+                  <Text fontWeight="bold">Başvuru Durumu</Text>
+                  <VStack align="start" spacing={2} mt={2}>
+                    {selectedBasvuru.durum_gecmisi.map((durum, index) => (
+                      <HStack key={index} spacing={3}>
+                        <Badge colorScheme={getDurumColor(durum.durum)}>
+                          {durum.durum}
+                        </Badge>
+                        <Text fontSize="sm">{formatDate(durum.tarih)}</Text>
+                        {durum.aciklama && <Text fontSize="sm" color="gray.600">{durum.aciklama}</Text>}
+                      </HStack>
+                    ))}
+                  </VStack>
+                </Box>
+                
+                {selectedBasvuru.puan !== null && selectedBasvuru.puan !== undefined && (
+                  <>
+                    <Divider />
+                    <Box>
+                      <Text fontWeight="bold">Puanlama</Text>
+                      <Stat mt={2}>
+                        <StatNumber>{selectedBasvuru.puan}</StatNumber>
+                        <StatHelpText>Değerlendirme Puanı</StatHelpText>
+                      </Stat>
+                    </Box>
+                  </>
+                )}
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={onBasvuruDetailClose}>Kapat</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </Box>
   );
 };
 

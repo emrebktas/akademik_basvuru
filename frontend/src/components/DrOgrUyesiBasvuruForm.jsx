@@ -36,11 +36,6 @@ import {
   ListItem,
   FormHelperText,
   Checkbox,
-  Tabs,
-  TabList,
-  TabPanels,
-  TabPanel,
-  Spinner,
   Flex,
   Grid,
   GridItem,
@@ -55,8 +50,10 @@ import {
   ModalCloseButton,
   Center,
   Link,
+  Spinner,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, DeleteIcon, AddIcon, DownloadIcon, ViewIcon } from '@chakra-ui/icons';
+import { FaPaperPlane } from 'react-icons/fa';
 
 // Kocaeli Üniversitesi tema renkleri
 const theme = {
@@ -70,11 +67,36 @@ const theme = {
   info: "#3498db" // Açık mavi
 };
 
+// Keep hardcoded base descriptions as fallback
+const fallbackBaseDescriptions = {
+  'A1': 'SCI-E, SSCI veya AHCI kapsamındaki Q1 dergileri',
+  'A2': 'SCI-E, SSCI veya AHCI kapsamındaki Q2 dergileri',
+  'A3': 'SCI-E, SSCI veya AHCI kapsamındaki Q3 dergileri',
+  'A4': 'SCI-E, SSCI veya AHCI kapsamındaki Q4 dergileri',
+  'A5': 'ESCI tarafından taranan dergiler',
+  'A6': 'Scopus tarafından taranan dergiler',
+  'A7': 'Uluslararası diğer indekslerde taranan dergiler',
+  'A8': 'ULAKBİM TR Dizin tarafından taranan dergiler'
+};
+
+// Fallback points (from previous switch case)
+const fallbackPoints = {
+  'A1': 60, 'A2': 55, 'A3': 40, 'A4': 30, 'A5': 25, 'A6': 20, 'A7': 15, 'A8': 10
+};
+
 const DrOgrUyesiBasvuruForm = () => {
   const navigate = useNavigate();
   // Get the ilan information from localStorage that was set in the AdayEkrani component
-  const ilanID = localStorage.getItem('selectedIlanId') || '';
-  const ilanBasligi = localStorage.getItem('selectedIlanTitle') || '';
+  const ilanID = localStorage.getItem('selectedJobId') || '';
+  const ilanBasligi = localStorage.getItem('selectedJobTitle') || '';
+  const ilanKademe = localStorage.getItem('selectedJobKademe') || '';
+  
+  // Add debug logs
+  console.log('Debug - localStorage values:');
+  console.log('ilanID:', ilanID);
+  console.log('ilanBasligi:', ilanBasligi);
+  console.log('ilanKademe:', ilanKademe);
+  
   const [currentStep, setCurrentStep] = useState(0);
   const [fieldGroup, setFieldGroup] = useState('');
   const [formData, setFormData] = useState({
@@ -84,14 +106,8 @@ const DrOgrUyesiBasvuruForm = () => {
   });
   
   // Add new state variables for academic activities
-  const [projects, setProjects] = useState([]);
-  const [books, setBooks] = useState([]);
-  const [citations, setCitations] = useState([]);
-  const [presentations, setPresentations] = useState([]);
-  const [awards, setAwards] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [publications, setPublications] = useState([]);
-  const [selectedTab, setSelectedTab] = useState(0);
   const [criteria, setCriteria] = useState(null);
   const [totalPoints, setTotalPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -129,11 +145,6 @@ const DrOgrUyesiBasvuruForm = () => {
   const categories = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'];
 
   // Constants for academic activities
-  const PROJECT_TYPES = ['TÜBİTAK', 'AB', 'BAP', 'Diğer'];
-  const PROJECT_ROLES = ['Yürütücü', 'Araştırmacı', 'Danışman'];
-  const BOOK_TYPES = ['Kitap', 'Kitap Bölümü'];
-  const CITATION_INDEXES = ['WoS', 'Scopus'];
-  const PRESENTATION_TYPES = ['Sözlü', 'Poster'];
 
   // Kategori-İndeks eşleştirme haritası
   const categoryIndexMap = {
@@ -147,17 +158,8 @@ const DrOgrUyesiBasvuruForm = () => {
     'A8': 'TR Dizin' // ULAKBİM TR Dizin tarafından taranan dergiler - 10 puan
   };
 
-  // Kategori açıklamaları
-  const categoryDescriptions = {
-    'A1': 'SCI-E, SSCI veya AHCI kapsamındaki Q1 dergileri (60 puan)',
-    'A2': 'SCI-E, SSCI veya AHCI kapsamındaki Q2 dergileri (55 puan)',
-    'A3': 'SCI-E, SSCI veya AHCI kapsamındaki Q3 dergileri (40 puan)',
-    'A4': 'SCI-E, SSCI veya AHCI kapsamındaki Q4 dergileri (30 puan)',
-    'A5': 'ESCI tarafından taranan dergiler (25 puan)',
-    'A6': 'Scopus tarafından taranan dergiler (20 puan)',
-    'A7': 'Uluslararası diğer indekslerde taranan dergiler (15 puan)',
-    'A8': 'ULAKBİM TR Dizin tarafından taranan dergiler (10 puan)'
-  };
+  // Kategori açıklamaları (No longer used directly in dropdown, kept for reference or other uses if any)
+  // const categoryDescriptions = { ... }; 
 
   // Yayın yılı seçenekleri için dizi oluştur (1900'den 2025'e kadar)
   const generateYearOptions = () => {
@@ -170,6 +172,41 @@ const DrOgrUyesiBasvuruForm = () => {
 
   const yearOptions = generateYearOptions();
 
+  // Add effect to fetch ilan details if kademe is not available
+  useEffect(() => {
+    const fetchIlanDetails = async () => {
+      try {
+        if (ilanID && !ilanKademe) {
+          console.log('Fetching ilan details because kademe is missing');
+          const response = await axios.get(`/api/applications/post-details/${ilanID}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.data) {
+            console.log('Fetched ilan details:', response.data);
+            // Store the fetched kademe in localStorage
+            localStorage.setItem('selectedJobKademe', response.data.kademe || '');
+            // Force a reload to use the updated localStorage value
+            window.location.reload();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching ilan details:', error);
+        toast({
+          title: 'Hata',
+          description: 'İlan detayları alınırken bir hata oluştu.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    };
+    
+    fetchIlanDetails();
+  }, [ilanID, ilanKademe, toast]);
+
   // Fetch criteria when field group changes
   useEffect(() => {
     if (fieldGroup) {
@@ -180,44 +217,62 @@ const DrOgrUyesiBasvuruForm = () => {
   // Calculate total points based on publications
   useEffect(() => {
     calculateTotalPoints();
-  }, [publications]);
+  }, [publications, criteria]);
 
   const calculateTotalPoints = () => {
     console.log("Publications to calculate points:", publications);
+    console.log("Current criteria:", criteria); // Log fetched criteria
     let points = 0;
-    
-    // Her kategori için önceden belirlenmiş puan değerlerini kullan
+
+    // Check if criteria and a point system within it exist
+    // !! Adjust the path `criteria?.pointSystem?.publications` based on your actual criteria object structure !!
+    const categoryPointsMap = criteria?.pointSystem?.publications; 
+
+    if (!categoryPointsMap) {
+      console.warn("Dynamic category points not found in criteria object structure (expected path: criteria.pointSystem.publications). Using hardcoded fallback.");
+    }
+
     publications.forEach(pub => {
       console.log("Processing publication:", pub);
       console.log("Category:", pub.category, "isMainAuthor:", pub.isMainAuthor);
-      
-      // Kategori bazlı puanlama
+
       let categoryPoints = 0;
-      switch(pub.category) {
-        case 'A1': categoryPoints = 60; break; // Q1
-        case 'A2': categoryPoints = 55; break; // Q2
-        case 'A3': categoryPoints = 40; break; // Q3
-        case 'A4': categoryPoints = 30; break; // Q4
-        case 'A5': categoryPoints = 25; break; // ESCI
-        case 'A6': categoryPoints = 20; break; // Scopus
-        case 'A7': categoryPoints = 15; break; // Diğer Uluslararası
-        case 'A8': categoryPoints = 10; break; // TR Dizin
-        default: categoryPoints = 5; break;
+      // Try to get points dynamically
+      if (categoryPointsMap && categoryPointsMap[pub.category] !== undefined) {
+        categoryPoints = categoryPointsMap[pub.category];
+        console.log(`Dynamic points for category ${pub.category}:`, categoryPoints);
+      } else {
+        // Fallback to hardcoded values if dynamic points are not available
+        if (categoryPointsMap === undefined) { // Only warn if the map exists but the category doesn't
+             console.warn(`No dynamic points found for category ${pub.category}. Using fallback.`);
+        }
+        switch(pub.category) {
+          case 'A1': categoryPoints = 60; break; // Q1
+          case 'A2': categoryPoints = 55; break; // Q2
+          case 'A3': categoryPoints = 40; break; // Q3
+          case 'A4': categoryPoints = 30; break; // Q4
+          case 'A5': categoryPoints = 25; break; // ESCI
+          case 'A6': categoryPoints = 20; break; // Scopus
+          case 'A7': categoryPoints = 15; break; // Diğer Uluslararası
+          case 'A8': categoryPoints = 10; break; // TR Dizin
+          default: categoryPoints = 5; break; // Default fallback
+        }
       }
-      
+
       console.log("Points from category:", categoryPoints);
-      
-      // Ana yazar bonus puanı
-      let authorPoints = pub.isMainAuthor ? 10 : 0;
+
+      // Ana yazar bonus puanı (assuming this logic remains or is also defined in criteria)
+      // !! Adjust `criteria?.pointSystem?.mainAuthorBonus` if your structure is different !!
+      let authorPoints = pub.isMainAuthor ? (criteria?.pointSystem?.mainAuthorBonus || 10) : 0; 
       console.log("Bonus points for main author:", authorPoints);
-      
+
       points += categoryPoints + authorPoints;
       console.log("Total points so far:", points);
     });
-    
+
     console.log("Final total points:", points);
     setTotalPoints(points);
-    
+
     // Debug için - getPublicationStats fonksiyonunu çağırıp puanları kontrol edelim
     const stats = getPublicationStats();
     console.log("Debug - Publication Statistics:", stats);
@@ -330,20 +385,41 @@ const DrOgrUyesiBasvuruForm = () => {
                (criteria ? Number(formData.dilPuani) >= criteria.minLanguageScore : Number(formData.dilPuani) >= 65);
       
       case 2: {
+        // Remove the allowance to proceed with just one publication
         if (!criteria) return false;
         
         const stats = getPublicationStats();
         const { publicationCriteria, pointCriteria } = criteria;
         
-        return stats.totalCount >= publicationCriteria.minTotalPublications && 
-               stats.a1a2Count >= publicationCriteria.minA1A2Publications && 
-               stats.a1a4Count >= publicationCriteria.minA1A4Publications &&
-               stats.a1a5Count >= publicationCriteria.minA1A5Publications &&
-               stats.mainAuthorCount >= publicationCriteria.minMainAuthorPublications &&
-               stats.a1a4Points >= publicationCriteria.minA1A4Points &&
-               stats.a1a5Points >= publicationCriteria.minA1A5Points &&
-               totalPoints >= pointCriteria.minPoints &&
-               totalPoints <= pointCriteria.maxPoints;
+        // For debugging
+        console.log('isValidStep for step 2:');
+        console.log('stats:', stats);
+        console.log('criteria:', criteria);
+        console.log('totalPoints:', totalPoints);
+        
+        // Check each condition individually for easier debugging
+        const totalPublicationsValid = stats.totalCount >= publicationCriteria.minTotalPublications;
+        const a1a2Valid = stats.a1a2Count >= publicationCriteria.minA1A2Publications;
+        const a1a4Valid = stats.a1a4Count >= publicationCriteria.minA1A4Publications;
+        const a1a5Valid = stats.a1a5Count >= publicationCriteria.minA1A5Publications;
+        const mainAuthorValid = stats.mainAuthorCount >= publicationCriteria.minMainAuthorPublications;
+        const a1a4PointsValid = stats.a1a4Points >= publicationCriteria.minA1A4Points;
+        const a1a5PointsValid = stats.a1a5Points >= publicationCriteria.minA1A5Points;
+        const minPointsValid = totalPoints >= pointCriteria.minPoints;
+        
+        console.log('Validation results:');
+        console.log('totalPublicationsValid:', totalPublicationsValid);
+        console.log('a1a2Valid:', a1a2Valid);
+        console.log('a1a4Valid:', a1a4Valid);
+        console.log('a1a5Valid:', a1a5Valid);
+        console.log('mainAuthorValid:', mainAuthorValid);
+        console.log('a1a4PointsValid:', a1a4PointsValid);
+        console.log('a1a5PointsValid:', a1a5PointsValid);
+        console.log('minPointsValid:', minPointsValid);
+        
+        return totalPublicationsValid && a1a2Valid && a1a4Valid && 
+               a1a5Valid && mainAuthorValid && a1a4PointsValid && 
+               a1a5PointsValid && minPointsValid;
       }
       
       case 3:
@@ -356,6 +432,7 @@ const DrOgrUyesiBasvuruForm = () => {
   };
 
   const handleNextStep = () => {
+    // Remove the special case for step 2 with publications
     if (!isValidStep()) {
       toast({
         title: 'Uyarı',
@@ -363,7 +440,9 @@ const DrOgrUyesiBasvuruForm = () => {
           ? 'Lütfen temel alanınızı seçiniz.'
           : currentStep === 1 
             ? 'Lütfen tüm alanları doldurunuz ve dil puanının 65 veya üzeri olduğundan emin olunuz.'
-            : 'Lütfen tüm gereksinimleri karşılayınız.',
+            : currentStep === 2
+              ? 'Lütfen yayınlarınız için tüm kriterleri karşıladığınızdan emin olunuz.'
+              : 'Lütfen tüm gereksinimleri karşılayınız.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -374,6 +453,7 @@ const DrOgrUyesiBasvuruForm = () => {
     if (currentStep === 3) {
       handleSubmitApplication();
     } else {
+      // Move to the next step (removed tab index reset since it's not used)
       setCurrentStep(prev => prev + 1);
     }
   };
@@ -532,26 +612,29 @@ const DrOgrUyesiBasvuruForm = () => {
 
   const handleSubmitApplication = async () => {
     try {
+      // Sadece gerekli alanları içeren basit bir veri yapısı
       const applicationData = {
         academic_post: ilanID,
         fieldGroup,
+        kademe: ilanKademe || 'Dr. Öğr. Üyesi', // Varsayılan değer
         languageExam: {
           type: formData.dilSinavi,
           score: Number(formData.dilPuani)
         },
-        publications: publications.map(p => p._id),
-        projects: projects.map(p => p._id),
-        books: books.map(b => b._id),
-        citations: citations.map(c => c._id),
-        presentations: presentations.map(p => p._id),
-        awards: awards.map(a => a._id)
+        publications: publications.map(p => p._id)
       };
+
+      // Konsola gönderilen verileri yazarak debug kolaylığı sağla
+      console.log('Gönderilen başvuru verileri:', applicationData);
 
       const response = await axios.post('/api/applications/submit', applicationData, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
+
+      // Başarılı yanıtı logla
+      console.log('Başvuru yanıtı:', response.data);
 
       if (response.data.success) {
         toast({
@@ -562,488 +645,35 @@ const DrOgrUyesiBasvuruForm = () => {
           isClosable: true,
         });
         
-        // Clear localStorage
-        localStorage.removeItem('selectedIlanId');
-        localStorage.removeItem('selectedIlanTitle');
+        // LocalStorage'dan seçili ilan bilgilerini temizle
+        localStorage.removeItem('selectedJobId');
+        localStorage.removeItem('selectedJobTitle');
+        localStorage.removeItem('selectedJobKademe');
         
-        // Navigate back to the applications listing
+        // Başvurular listesine geri dön
         navigate('/aday-ekrani');
       }
     } catch (err) {
       console.error('Başvuru gönderme hatası:', err);
-      toast({
-        title: 'Hata',
-        description: 'Başvuru gönderilirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  // Add handlers for academic activities
-  const handleAddProject = async (projectData) => {
-    try {
-      const formData = new FormData();
-      Object.entries(projectData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
       
-      if (selectedFile) {
-        formData.append('proofFile', selectedFile);
-      }
-
-      const response = await axios.post('/api/academic-activities/projects', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      setProjects([...projects, response.data.project]);
-      setSelectedFile(null);
-      toast({
-        title: 'Başarılı',
-        description: 'Proje başarıyla eklendi.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Proje ekleme hatası:', error);
-      toast({
-        title: 'Hata',
-        description: 'Proje eklenirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleAddBook = async (bookData) => {
-    try {
-      const formData = new FormData();
-      Object.entries(bookData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
+      // Sunucudan dönen hata mesajını göster, yoksa genel hata mesajı kullan
+      const errorMessage = err.response?.data?.message || 'Başvuru gönderilirken bir hata oluştu.';
       
-      if (selectedFile) {
-        formData.append('proofFile', selectedFile);
-      }
-
-      const response = await axios.post('/api/academic-activities/books', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      setBooks([...books, response.data.book]);
-      setSelectedFile(null);
-      toast({
-        title: 'Başarılı',
-        description: 'Kitap başarıyla eklendi.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Kitap ekleme hatası:', error);
       toast({
         title: 'Hata',
-        description: 'Kitap eklenirken bir hata oluştu.',
+        description: errorMessage,
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
     }
-  };
-
-  const handleAddCitation = async (citationData) => {
-    try {
-      const formData = new FormData();
-      Object.entries(citationData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-      
-      if (selectedFile) {
-        formData.append('proofFile', selectedFile);
-      }
-
-      const response = await axios.post('/api/academic-activities/citations', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      setCitations([...citations, response.data.citation]);
-      setSelectedFile(null);
-      toast({
-        title: 'Başarılı',
-        description: 'Atıf başarıyla eklendi.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Atıf ekleme hatası:', error);
-      toast({
-        title: 'Hata',
-        description: 'Atıf eklenirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleAddPresentation = async (presentationData) => {
-    try {
-      const formData = new FormData();
-      Object.entries(presentationData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-      
-      if (selectedFile) {
-        formData.append('proofFile', selectedFile);
-      }
-
-      const response = await axios.post('/api/academic-activities/presentations', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      setPresentations([...presentations, response.data.presentation]);
-      setSelectedFile(null);
-      toast({
-        title: 'Başarılı',
-        description: 'Bildiri başarıyla eklendi.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Bildiri ekleme hatası:', error);
-      toast({
-        title: 'Hata',
-        description: 'Bildiri eklenirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleAddAward = async (awardData) => {
-    try {
-      const formData = new FormData();
-      Object.entries(awardData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-      
-      if (selectedFile) {
-        formData.append('proofFile', selectedFile);
-      }
-
-      const response = await axios.post('/api/academic-activities/awards', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      setAwards([...awards, response.data.award]);
-      setSelectedFile(null);
-      toast({
-        title: 'Başarılı',
-        description: 'Ödül başarıyla eklendi.',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Ödül ekleme hatası:', error);
-      toast({
-        title: 'Hata',
-        description: 'Ödül eklenirken bir hata oluştu.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const renderAcademicActivities = () => {
-    return (
-      <VStack spacing={6} align="stretch">
-        <Tabs variant="enclosed" colorScheme="blue" onChange={setSelectedTab} index={selectedTab}>
-          <TabList>
-            <Tab>Projeler</Tab>
-            <Tab>Kitaplar</Tab>
-            <Tab>Atıflar</Tab>
-            <Tab>Bildiriler</Tab>
-            <Tab>Ödüller</Tab>
-          </TabList>
-
-          <TabPanels>
-            {/* Projects Tab */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Proje Türü</FormLabel>
-                  <Select placeholder="Proje türü seçiniz">
-                    {PROJECT_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Rol</FormLabel>
-                  <Select placeholder="Rolünüzü seçiniz">
-                    {PROJECT_ROLES.map(role => (
-                      <option key={role} value={role}>{role}</option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Bütçe (TL)</FormLabel>
-                  <NumberInput min={0}>
-                    <NumberInputField placeholder="Proje bütçesini giriniz" />
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Süre (Ay)</FormLabel>
-                  <NumberInput min={1}>
-                    <NumberInputField placeholder="Proje süresini giriniz" />
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Kanıt Belgesi</FormLabel>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setSelectedFile(e.target.files[0])}
-                  />
-                </FormControl>
-
-                <Button
-                  colorScheme="green"
-                  leftIcon={<AddIcon />}
-                  onClick={handleAddProject}
-                >
-                  Proje Ekle
-                </Button>
-              </VStack>
-            </TabPanel>
-
-            {/* Books Tab */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Tür</FormLabel>
-                  <Select placeholder="Kitap türü seçiniz">
-                    {BOOK_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Yayınevi</FormLabel>
-                  <Input placeholder="Yayınevi adını giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>ISBN</FormLabel>
-                  <Input placeholder="ISBN numarasını giriniz" />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Bölüm Bilgisi</FormLabel>
-                  <Input placeholder="Bölüm bilgisini giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Kanıt Belgesi</FormLabel>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setSelectedFile(e.target.files[0])}
-                  />
-                </FormControl>
-
-                <Button
-                  colorScheme="green"
-                  leftIcon={<AddIcon />}
-                  onClick={handleAddBook}
-                >
-                  Kitap Ekle
-                </Button>
-              </VStack>
-            </TabPanel>
-
-            {/* Citations Tab */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Atıf Yapan Eser</FormLabel>
-                  <Input placeholder="Atıf yapan eserin adını giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Yıl</FormLabel>
-                  <NumberInput min={1900} max={new Date().getFullYear()}>
-                    <NumberInputField placeholder="Atıf yılını giriniz" />
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>İndeks</FormLabel>
-                  <Select placeholder="İndeks seçiniz">
-                    {CITATION_INDEXES.map(index => (
-                      <option key={index} value={index}>{index}</option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Ekran Görüntüsü</FormLabel>
-                  <Input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) => setSelectedFile(e.target.files[0])}
-                  />
-                </FormControl>
-
-                <Button
-                  colorScheme="green"
-                  leftIcon={<AddIcon />}
-                  onClick={handleAddCitation}
-                >
-                  Atıf Ekle
-                </Button>
-              </VStack>
-            </TabPanel>
-
-            {/* Presentations Tab */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Konferans Adı</FormLabel>
-                  <Input placeholder="Konferans adını giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Sunum Türü</FormLabel>
-                  <Select placeholder="Sunum türü seçiniz">
-                    {PRESENTATION_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl>
-                  <Checkbox>Uluslararası mı?</Checkbox>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Katılım Belgesi</FormLabel>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setSelectedFile(e.target.files[0])}
-                  />
-                </FormControl>
-
-                <Button
-                  colorScheme="green"
-                  leftIcon={<AddIcon />}
-                  onClick={handleAddPresentation}
-                >
-                  Bildiri Ekle
-                </Button>
-              </VStack>
-            </TabPanel>
-
-            {/* Awards Tab */}
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>Ödül Adı</FormLabel>
-                  <Input placeholder="Ödül adını giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Kurum</FormLabel>
-                  <Input placeholder="Ödülü veren kurumu giriniz" />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Yıl</FormLabel>
-                  <NumberInput min={1900} max={new Date().getFullYear()}>
-                    <NumberInputField placeholder="Ödül yılını giriniz" />
-                  </NumberInput>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Ödül Belgesi</FormLabel>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setSelectedFile(e.target.files[0])}
-                  />
-                </FormControl>
-
-                <Button
-                  colorScheme="green"
-                  leftIcon={<AddIcon />}
-                  onClick={handleAddAward}
-                >
-                  Ödül Ekle
-                </Button>
-              </VStack>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-
-        {/* Display added items */}
-        <Box mt={6}>
-          <SimpleGrid columns={2} spacing={4}>
-            <Stat>
-              <StatLabel>Projeler</StatLabel>
-              <StatNumber>{projects.length}</StatNumber>
-            </Stat>
-            <Stat>
-              <StatLabel>Kitaplar</StatLabel>
-              <StatNumber>{books.length}</StatNumber>
-            </Stat>
-            <Stat>
-              <StatLabel>Atıflar</StatLabel>
-              <StatNumber>{citations.length}</StatNumber>
-            </Stat>
-            <Stat>
-              <StatLabel>Bildiriler</StatLabel>
-              <StatNumber>{presentations.length}</StatNumber>
-            </Stat>
-            <Stat>
-              <StatLabel>Ödüller</StatLabel>
-              <StatNumber>{awards.length}</StatNumber>
-            </Stat>
-          </SimpleGrid>
-        </Box>
-      </VStack>
-    );
   };
 
   const renderPublicationForm = () => {
+    // !! Adjust paths based on your actual criteria object structure !!
+    const dynamicBaseDescriptions = criteria?.pointSystem?.publicationBaseDescriptions;
+    const dynamicPoints = criteria?.pointSystem?.publications;
+
     return (
       <Grid templateColumns="repeat(2, 1fr)" gap={4}>
         <GridItem colSpan={2}>
@@ -1055,9 +685,18 @@ const DrOgrUyesiBasvuruForm = () => {
               onChange={(e) => handlePublicationInputChange('category', e.target.value)}
               size="sm"
             >
-              {categories.map(kat => (
-                <option key={kat} value={kat}>{kat} - {categoryDescriptions[kat]}</option>
-              ))}
+              {categories.map(kat => {
+                  // Determine base description
+                  const baseDesc = dynamicBaseDescriptions?.[kat] || fallbackBaseDescriptions[kat] || kat;
+                  // Determine points using nullish coalescing for fallback
+                  const points = dynamicPoints?.[kat] ?? fallbackPoints[kat]; 
+                  // Combine
+                  const displayLabel = `${baseDesc}${points !== undefined ? ` (${points} puan)` : ''}`;
+
+                  return (
+                      <option key={kat} value={kat}>{displayLabel}</option>
+                  );
+              })}
             </Select>
           </FormControl>
         </GridItem>
@@ -1066,6 +705,7 @@ const DrOgrUyesiBasvuruForm = () => {
           <FormControl>
             <FormLabel>İndeks</FormLabel>
             <Input 
+              // Consider if index should also be dynamic based on criteria
               value={newPublication.category ? categoryIndexMap[newPublication.category] || '' : ''}
               isReadOnly
               bg="gray.100"
@@ -1160,6 +800,7 @@ const DrOgrUyesiBasvuruForm = () => {
             </Button>
           </Flex>
         </GridItem>
+
       </Grid>
     );
   };
@@ -1170,6 +811,18 @@ const DrOgrUyesiBasvuruForm = () => {
     
     return (
       <VStack spacing={6} align="stretch">
+        <FormControl>
+          <FormLabel fontWeight="bold">Başvurulan Akademik Kadro</FormLabel>
+          <Input
+            value={ilanKademe ? `${ilanKademe} - ${ilanBasligi}` : ilanBasligi}
+            isReadOnly
+            bg="gray.100"
+            size="lg"
+            borderColor="gray.300"
+          />
+          <FormHelperText>Başvurunuz bu akademik kadro için değerlendirilecektir.</FormHelperText>
+        </FormControl>
+
         <FormControl isRequired>
           <FormLabel fontWeight="bold">Ad Soyad</FormLabel>
           <Input
@@ -1244,6 +897,7 @@ const DrOgrUyesiBasvuruForm = () => {
       const pdfData = {
         academic_post: ilanID,
         fieldGroup,
+        kademe: ilanKademe || 'Dr. Öğr. Üyesi', // Provide default value if missing
         personalInfo: {
           fullName: formData.adSoyad,
           languageExam: formData.dilSinavi,
@@ -1271,7 +925,7 @@ const DrOgrUyesiBasvuruForm = () => {
       
       toast({
         title: 'PDF Hazır',
-        description: 'Form bilgilerinizle doldurulmuş PDF hazırlandı.',
+        description: 'Form bilgilerinize göre doldurulmuş PDF hazırlandı.',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -1466,7 +1120,7 @@ const DrOgrUyesiBasvuruForm = () => {
     );
   };
 
-  // Update the renderStep function
+  // Update the render function
   const renderStep = () => {
     switch (currentStep) {
       case 0:
@@ -1508,11 +1162,183 @@ const DrOgrUyesiBasvuruForm = () => {
         return renderPublicationsStep();
 
       case 3:
-        return renderAcademicActivities();
+        return renderFinishApplication();
 
       default:
         return null;
     }
+  };
+
+  // Add renderFinishApplication function
+  const renderFinishApplication = () => {
+    const stats = getPublicationStats();
+    
+    return (
+      <VStack spacing={8} align="stretch">
+        {/* Summary Card */}
+        <Card borderWidth="1px" borderRadius="lg" overflow="hidden">
+          <CardHeader bg={theme.light} pb={2}>
+            <Heading size="md" color={theme.primary}>Başvuru Özeti</Heading>
+            <Text fontSize="sm" color="gray.600">Lütfen başvuru bilgilerinizi kontrol ediniz.</Text>
+          </CardHeader>
+          
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              {/* Kişisel Bilgiler */}
+              <Box>
+                <Heading size="sm" mb={3} pb={2} borderBottom="1px" borderColor="gray.200">
+                  Kişisel Bilgiler
+                </Heading>
+                <VStack align="start" spacing={3}>
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">Ad Soyad</Text>
+                    <Text fontWeight="medium">{formData.adSoyad}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">Temel Alan</Text>
+                    <Text fontWeight="medium">{fieldGroups[fieldGroup]}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">Yabancı Dil Sınavı</Text>
+                    <HStack>
+                      <Badge colorScheme="blue">{formData.dilSinavi}</Badge>
+                      <Badge colorScheme="green">{formData.dilPuani} Puan</Badge>
+                    </HStack>
+                  </Box>
+                </VStack>
+              </Box>
+              
+              {/* Yayın İstatistikleri */}
+              <Box>
+                <Heading size="sm" mb={3} pb={2} borderBottom="1px" borderColor="gray.200">
+                  Yayın İstatistikleri
+                </Heading>
+                {criteria && (
+                  <SimpleGrid columns={2} spacing={4}>
+                    <Stat size="sm">
+                      <StatLabel fontSize="xs">Toplam Yayın</StatLabel>
+                      <StatNumber fontSize="md" color={stats.totalCount >= criteria.publicationCriteria.minTotalPublications ? theme.success : theme.danger}>
+                        {stats.totalCount} / {criteria.publicationCriteria.minTotalPublications}
+                      </StatNumber>
+                    </Stat>
+                    <Stat size="sm">
+                      <StatLabel fontSize="xs">A1-A2 Yayınlar</StatLabel>
+                      <StatNumber fontSize="md" color={stats.a1a2Count >= criteria.publicationCriteria.minA1A2Publications ? theme.success : theme.danger}>
+                        {stats.a1a2Count} / {criteria.publicationCriteria.minA1A2Publications}
+                      </StatNumber>
+                    </Stat>
+                    <Stat size="sm">
+                      <StatLabel fontSize="xs">A1-A4 Yayınlar</StatLabel>
+                      <StatNumber fontSize="md" color={stats.a1a4Count >= criteria.publicationCriteria.minA1A4Publications ? theme.success : theme.danger}>
+                        {stats.a1a4Count} / {criteria.publicationCriteria.minA1A4Publications}
+                      </StatNumber>
+                    </Stat>
+                    <Stat size="sm">
+                      <StatLabel fontSize="xs">Toplam Puan</StatLabel>
+                      <StatNumber fontSize="md" color={totalPoints >= criteria.pointCriteria.minPoints ? theme.success : theme.danger}>
+                        {totalPoints} / {criteria.pointCriteria.minPoints}
+                      </StatNumber>
+                    </Stat>
+                  </SimpleGrid>
+                )}
+              </Box>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
+        
+        {/* Publication List */}
+        <Card borderWidth="1px" borderRadius="lg" overflow="hidden">
+          <CardHeader bg={theme.light} pb={2}>
+            <Heading size="md" color={theme.primary}>Yayınlar ({publications.length})</Heading>
+          </CardHeader>
+          
+          <CardBody maxH="300px" overflowY="auto" p={3}>
+            <Stack spacing={3}>
+              {publications.length > 0 ? (
+                publications.map((pub, index) => (
+                  <Box 
+                    key={pub._id || index}
+                    p={3}
+                    borderWidth="1px"
+                    borderRadius="md"
+                    bg="white"
+                  >
+                    <Flex justify="space-between">
+                      <Box>
+                        <Text fontWeight="bold" fontSize="sm">{pub.title}</Text>
+                        <HStack mt={1} spacing={2}>
+                          <Badge colorScheme="blue">{pub.category}</Badge>
+                          <Badge colorScheme="purple">{pub.index}</Badge>
+                          <Badge colorScheme={pub.isMainAuthor ? "green" : "gray"}>
+                            {pub.isMainAuthor ? "Ana Yazar" : "Ortak Yazar"}
+                          </Badge>
+                          <Text fontSize="xs" color="gray.500">
+                            Yıl: {pub.publicationYear}
+                          </Text>
+                        </HStack>
+                        <Text fontSize="xs" mt={1} color="gray.600">DOI: {pub.doi}</Text>
+                      </Box>
+                      <IconButton
+                        icon={<ViewIcon />}
+                        size="sm"
+                        colorScheme="blue"
+                        variant="ghost"
+                        onClick={() => window.open(`https://doi.org/${pub.doi}`, '_blank')}
+                        aria-label="View publication"
+                      />
+                    </Flex>
+                  </Box>
+                ))
+              ) : (
+                <Alert status="warning">
+                  <AlertIcon />
+                  <Text>Henüz yayın eklenmemiş.</Text>
+                </Alert>
+              )}
+            </Stack>
+          </CardBody>
+        </Card>
+        
+        {/* Buttons */}
+        <HStack spacing={4} justify="center">
+          <Button
+            leftIcon={<ViewIcon />}
+            onClick={generateFilledPdf}
+            isLoading={isGeneratingPdf}
+            loadingText="PDF Hazırlanıyor"
+            colorScheme="teal"
+            variant="outline"
+            size="lg"
+          >
+            Atama Formu Önizleme
+          </Button>
+          
+          <Button
+            leftIcon={<FaPaperPlane />}
+            onClick={handleSubmitApplication}
+            colorScheme="blue"
+            size="lg"
+            bg={theme.primary}
+            _hover={{ bg: theme.info }}
+            isDisabled={!isValidStep()}
+          >
+            Başvuruyu Tamamla
+          </Button>
+        </HStack>
+        
+        {!isValidStep() && (
+          <Alert status="warning" borderRadius="md">
+            <AlertIcon />
+            <Box>
+              <AlertTitle>Bazı kriterler karşılanmadı!</AlertTitle>
+              <AlertDescription>
+                Başvurunuz için gereken tüm kriterleri karşıladığınızdan emin olun. Özellikle yayın sayısı ve puanlar kontrol edilmelidir.
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+      </VStack>
+    );
   };
 
   return (
@@ -1531,7 +1357,7 @@ const DrOgrUyesiBasvuruForm = () => {
         boxShadow="sm"
       >
         <Heading size="md" color={theme.primary}>
-          {ilanBasligi}
+          {ilanKademe ? `${ilanKademe} - ${ilanBasligi}` : ilanBasligi}
         </Heading>
       </Box>
 

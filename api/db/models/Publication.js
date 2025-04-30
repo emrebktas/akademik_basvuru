@@ -3,12 +3,12 @@ const mongoose = require('mongoose');
 const publicationSchema = new mongoose.Schema({
   category: {
     type: String,
-    enum: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'],
+    enum: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9'],
     required: true
   },
   index: {
     type: String,
-    enum: ['Q1', 'Q2', 'Q3', 'Q4', 'ESCI', 'Scopus', 'TR Dizin'],
+    enum: ['Q1', 'Q2', 'Q3', 'Q4', 'ESCI', 'Scopus', 'Uluslararası Diğer', 'TR Dizin', 'Ulusal Hakemli'],
     required: true
   },
   title: {
@@ -29,6 +29,10 @@ const publicationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  points: {
+    type: Number,
+    default: 0
+  },
   pdfFile: {
     type: String,
     required: true
@@ -46,6 +50,27 @@ const publicationSchema = new mongoose.Schema({
 
 // Aynı DOI numarasına sahip makale eklenemez
 publicationSchema.index({ doi: 1 }, { unique: true });
+
+// Makale puanlarını otomatik hesapla
+publicationSchema.pre('save', function(next) {
+  // İndeks ve kategori bilgisine göre puan hesaplama
+  const pointValues = {
+    'Q1': 60,  // SCI-E, SSCI veya AHCI kapsamındaki dergilerde yayımlanmış makale (Q1)
+    'Q2': 55,  // SCI-E, SSCI veya AHCI kapsamındaki dergilerde yayımlanmış makale (Q2)
+    'Q3': 40,  // SCI-E, SSCI veya AHCI kapsamındaki dergilerde yayımlanmış makale (Q3)
+    'Q4': 30,  // SCI-E, SSCI veya AHCI kapsamındaki dergilerde yayımlanmış makale (Q4)
+    'ESCI': 25, // ESCI tarafından taranan dergilerde yayımlanmış makale
+    'Scopus': 20, // Scopus tarafından taranan dergilerde yayımlanmış makale
+    'Uluslararası Diğer': 15, // Uluslararası diğer indekslerde taranan dergilerde yayımlanmış makale
+    'TR Dizin': 10, // ULAKBİM TR Dizin tarafından taranan ulusal hakemli dergilerde yayımlanmış makale
+    'Ulusal Hakemli': 8 // 8. madde dışındaki ulusal hakemli dergilerde yayımlanmış makale
+  };
+
+  // Makalenin indeksine göre puanı belirle
+  this.points = pointValues[this.index] || 0;
+  
+  next();
+});
 
 // İstatistik metodları
 publicationSchema.statics.getPublicationStats = async function(applicationId) {
@@ -72,7 +97,8 @@ publicationSchema.statics.getPublicationStats = async function(applicationId) {
         mainAuthorCount: {
           $sum: { $cond: ["$isMainAuthor", 1, 0] }
         },
-        totalCount: { $sum: 1 }
+        totalCount: { $sum: 1 },
+        totalPoints: { $sum: "$points" }
       }
     }
   ]);
@@ -82,7 +108,8 @@ publicationSchema.statics.getPublicationStats = async function(applicationId) {
     a1a4Count: 0,
     a1a5Count: 0,
     mainAuthorCount: 0,
-    totalCount: 0
+    totalCount: 0,
+    totalPoints: 0
   };
 };
 
